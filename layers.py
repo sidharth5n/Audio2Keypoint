@@ -20,7 +20,7 @@ class ImageEncoderPIV(nn.Module):
                                     ConvLayer(32, 32, 3, 1, 1, '2D'))
 
     def forward(self, image):
-        return self.layers(image).mean(dim = 2)
+        return self.layers(image).mean(dim = 2) # check dim
 
 class ImageEncoderPV(nn.Module):
     """
@@ -34,9 +34,9 @@ class ImageEncoderPV(nn.Module):
 
     def forward(self, image):
         x = self.conv1(image)
-        x = torch.cat([x, x], dim = 1)
+        x = torch.cat([x, x], dim = 2) # check dim
         x = self.conv2(x)
-        x = torch.cat([x, x], dim = 1)
+        x = torch.cat([x, x], dim = 2) # check dim
         x = self.conv3(x)
         return x
 
@@ -69,13 +69,13 @@ class AudioEncoder(nn.Module):
 
     def forward(self, audio, pose, img_enc_pv, img_enc_piv):
         x = self.downsampling_blocks1to4(audio)
-        x = F.upsample(x, (pose.shape[1], 1), mode = 'bilinear').squeeze(2)
+        x = F.interpolate(x, (pose.shape[1], 1), mode = 'bilinear', align_corners = False).squeeze(2) # check dim
         outs = list()
         for layer in self.downsampling_blocks5to10:
             x = layer(x)
             outs.append(x)
         outs.reverse()
-        x = torch.cat([x, img_enc_pv, img_enc_piv], dim = 2)
+        x = torch.cat([x, img_enc_pv, img_enc_piv], dim = 2) #check dim
         x = self.conv(x)
         for y, layer in zip(outs[1:], self.convs):
             x = CatAndAdd(x, y, layer)
@@ -85,9 +85,9 @@ class Decoder(nn.Module):
     def __init__(self):
         super(Decoder, self).__init__()
         self.layers = nn.Sequential(ConvLayer(input_channels, 256, 3, 1, 1, '1D'),
-                                    ConvLayer(input_channels, 256, 3, 1, 1, '1D'),
-                                    ConvLayer(input_channels, 256, 3, 1, 1, '1D'),
-                                    ConvLayer(input_channels, 256, 3, 1, 1, '1D'))
+                                    ConvLayer(256, 256, 3, 1, 1, '1D'),
+                                    ConvLayer(256, 256, 3, 1, 1, '1D'),
+                                    ConvLayer(256, 256, 3, 1, 1, '1D'))
         self.logits = nn.Conv1d(input_channels, 136, kernel_size = 1, stride = 1, padding = 0)
 
     def forward(self, audio_enc):
@@ -97,7 +97,7 @@ class Decoder(nn.Module):
 
 class Discriminator(nn.Module):
     def __init__(self):
-        super(D_patchgan, self).__init__()
+        super(Discriminator, self).__init__()
         layers = list()
         for i in range(n_downsampling+1):
             if i == 0:
@@ -122,7 +122,7 @@ class Generator(nn.Module):
 
     def forward(self, audio, pose, image, image_enc_piv):
         image_enc_pv = self.image_encoder_pv(image)
-        image_enc_piv = torch.cat([image_enc_piv, image_enc_piv], dim = 1)
+        image_enc_piv = torch.cat([image_enc_piv, image_enc_piv], dim = 1) # check dim
         audio_input = MelSpectrogram(audio)
         audio_enc = self.audio_encoder(audio_input, pose, img_enc_pv, img_enc_piv)
         out = self.decoder(audio_enc)

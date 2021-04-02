@@ -4,7 +4,7 @@ from model import Audio2Keypoint
 from dataset import VoxKP
 from utils import KeyPointsRegLoss
 
-data_loader = 
+data_loader =
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = Audio2Keypoint().to(device)
@@ -18,11 +18,14 @@ D_optim = optim.Adam(model.discriminator.parameters(), lr = args.lr_d)
 E_optim = optim.Adam(model.encoder.parameters(), lr = args.lr_g)
 G_optim = optim.Adam(model.generator.parameters(), lr = args.lr_g)
 
+# TODO : Checkpoint saving, resume training from checkpoint
+
 iteration = 0
 
 for epoch in range(start_epoch, epochs):
     for data in data_loader:
         image, audio, real_pose, fake_pose = [x.to(device) for x in data]
+        # TODO : Modify forward pass, image_enc_piv is not being used
         image_enc_piv, fake_pose, real_enc, fake_enc = model(image, audio, real_pose, fake_pose)
 
         # remove base keypoint which is always [0,0]. Keeping it may ruin GANs training due discrete problems. etc.
@@ -51,9 +54,10 @@ for epoch in range(start_epoch, epochs):
             D_real_pose_input = D_real_pose
         elif self.args.d_input == 'both':
             # concatenate on the temporal axis
-            D_fake_pose_input = torch.cat([D_fake_pose, to_motion_delta(D_fake_pose)], dim = 1)
-            D_real_pose_input = torch.cat([D_real_pose, to_motion_delta(D_real_pose)], dim = 1)
+            D_fake_pose_input = torch.cat([D_fake_pose, to_motion_delta(D_fake_pose)], dim = 1) # check dim
+            D_real_pose_input = torch.cat([D_real_pose, to_motion_delta(D_real_pose)], dim = 1) # check dim
 
+        # TODO : Move the discriminator part to model.py
         fake_pose_score = self.discriminator(D_fake_pose_input)
         real_pose_score = self.discriminator(D_real_pose_input)
 
@@ -84,4 +88,4 @@ for epoch in range(start_epoch, epochs):
         G_optim.step()
 
         iteration += 1
-        print(f'Iter {:iteration} (epoch {:epoch}/{:epochs}) : Disc loss : {:D_loss}, Enc loss : {:E_loss}, Gen loss : {:G_loss}')
+        print(f'Iter {iteration} (epoch {epoch}/{epochs}) : Disc loss : {D_loss}, Enc loss : {E_loss}, Gen loss : {G_loss}')

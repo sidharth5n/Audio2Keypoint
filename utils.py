@@ -16,7 +16,7 @@ def ConvLayer(in_channels, out_channels, kernel_size, stride, padding, type, nor
                          nn.LeakyReLU(0.2))
 
 def CatAndAdd(x, y, layer):
-    return layer(torch.cat([x, x], dim = 1) + y)
+    return layer(torch.cat([x, x], dim = 1) + y) # check dim
 
 def MelSpectrogram(audio):
     stft = torch.stft(audio, n_fft = 512, hop_length = 160, win_length = 400,
@@ -54,6 +54,7 @@ class KeyPointsRegLoss(nn.Module):
 
     def forward(self, real_keypts, fake_keypts):
         loss = 0
+        # Do we really need to flatten before loss computation???
         if self.loss_on in ['pose', 'both']:
             loss = self.loss(real_keypts.view(-1), fake_keypts.view(-1))
         if self.loss_on in ['motion', 'both']:
