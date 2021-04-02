@@ -1,8 +1,9 @@
+import torch
 import torch.nn as nn
 from torch import optim
 from model import Audio2Keypoint
 from dataset import VoxKP
-from utils import KeyPointsRegLoss
+from utils import KeyPointsRegLoss, keypoints_to_train, to_motion_delta
 
 data_loader =
 
