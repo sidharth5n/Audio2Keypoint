@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils import ConvLayer, CatAndAdd, MelSpectrogram
+from utils import ConvLayer, CatAndAdd, MelSpectrogram, to_motion_delta
 
 class ImageEncoderPIV(nn.Module):
     """
@@ -96,8 +96,17 @@ class Decoder(nn.Module):
         return logits
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, d_input):
         super(Discriminator, self).__init__()
+        self.d_input = d_input
+        # d motion or pose
+        if d_input == 'motion':
+            self.motion_or_pose = lambda x : to_motion_delta(x)
+        elif d_input == 'pose':
+            self.motion_or_pose = lambda x : x
+        elif d_input == 'both':
+            self.motion_or_pose = lambda x : torch.cat([x, to_motion_delta(x)], dim = 1) # check dim
+
         layers = list()
         for i in range(n_downsampling+1):
             if i == 0:
@@ -109,9 +118,9 @@ class Discriminator(nn.Module):
         layers.append(nn.Conv1d(64*n, 1, 4, 1, padding)) #padding such that same size
         self.layers = nn.Sequential(layers)
 
-    def forward(self, x_pose):
-        return self.layers(x_pose)
-
+    def forward(self, pose):
+        motion_or_pose = self.motion_or_pose(pose)
+        return self.layers(motion_or_pose)
 
 class Generator(nn.Module):
     def __init__(self):
