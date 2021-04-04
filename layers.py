@@ -34,9 +34,9 @@ class ImageEncoderPV(nn.Module):
 
     def forward(self, image):
         x = self.conv1(image)
-        x = torch.cat([x, x], dim = 2) # check dim
+        x = torch.repeat_interleave(x, 2, dim = 1) # check dim
         x = self.conv2(x)
-        x = torch.cat([x, x], dim = 2) # check dim
+        x = torch.repeat_interleave(x, 2, dim = 1) # check dim
         x = self.conv3(x)
         return x
 
@@ -131,7 +131,7 @@ class Generator(nn.Module):
 
     def forward(self, audio, pose, image, image_enc_piv):
         image_enc_pv = self.image_encoder_pv(image)
-        image_enc_piv = torch.cat([image_enc_piv, image_enc_piv], dim = 1) # check dim
+        image_enc_piv = torch.repeat_interleave(image_enc_piv, 2, dim = 1) # check dim
         audio_input = MelSpectrogram(audio)
         audio_enc = self.audio_encoder(audio_input, pose, img_enc_pv, img_enc_piv)
         out = self.decoder(audio_enc)

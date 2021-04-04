@@ -16,7 +16,7 @@ def ConvLayer(in_channels, out_channels, kernel_size, stride, padding, type, nor
                          nn.LeakyReLU(0.2))
 
 def CatAndAdd(x, y, layer):
-    return layer(torch.cat([x, x], dim = 1) + y) # check dim
+    return layer(torch.repeat_interleave(x, 2, dim = 1) + y) # check dim
 
 def MelSpectrogram(audio):
     stft = torch.stft(audio, n_fft = 512, hop_length = 160, win_length = 400,
