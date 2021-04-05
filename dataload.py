@@ -15,7 +15,7 @@ class a2kData(Dataset):
     def __init__(self, df, set_name, config):
         self.df = df[df['dataset'] == set_name]
         self.config = config
-        self.to_tensor = transforms.ToTensor()
+        # self.to_tensor = transforms.ToTensor()
 
     def get_processor(self):
         processing_type = self.config["processor"] 
@@ -26,15 +26,16 @@ class a2kData(Dataset):
             d = decode_pose_normalized_keypoints_no_scaling
         else:
             raise ValueError("Wrong Processor")
-        return partial(f, self.config), d
+        # return partial(f), d
+        return f, d
 
-    def audio_pose_mel_spect(self,config, row):
+    def audio_pose_mel_spect(self, row):
         if "audio" in row:
             x = row["audio"]
         else:
             arr = np.load(row['pose_fn'])
             x = arr["audio"]
-        x = self.preprocess_x(x, self.config)
+        x = self.preprocess_x(x)
         y = preprocess_to_relative(get_pose(arr))
         y = normalize_relative_keypoints(y, row['speaker'])
         if "flatten" in self.config and self.config["flatten"]:
@@ -62,17 +63,20 @@ class a2kData(Dataset):
             x_sample, y_sample = process_row(row)
             X.append(x_sample)
             Y.append(y_sample)
+        """
         # Error at this step
         Y = self.to_tensor(Y)
         X = self.to_tensor(X)
-        """
+        
         # This is working
         Y = np.array(Y)
         X = np.array(X)
         """
+        Y = torch.FloatTensor(Y)
+        X = torch.FloatTensor(X)
         return X, Y
+
 """
-# Testing
 import pandas as pd
 
 df = pd.read_csv("train.csv")
