@@ -62,6 +62,25 @@ class a2kData(Dataset):
             x_sample, y_sample = process_row(row)
             X.append(x_sample)
             Y.append(y_sample)
+        # Error at this step
         Y = self.to_tensor(Y)
         X = self.to_tensor(X)
+        """
+        # This is working
+        Y = np.array(Y)
+        X = np.array(X)
+        """
         return X, Y
+"""
+# Testing
+import pandas as pd
+
+df = pd.read_csv("train.csv")
+AUDIO_SHAPE = 67267
+configs = {
+    "input_shape": [None, AUDIO_SHAPE],
+    "audio_to_pose": {"num_keypoints": 136, "processor": "audio_to_pose", "flatten": False, "input_shape": [None, AUDIO_SHAPE]},
+    "audio_to_pose_inference": {"num_keypoints": 136, "processor": "audio_to_pose_inference", "flatten": False, "input_shape": [None, AUDIO_SHAPE]}
+}
+mydata = a2kData(df,"train",configs["audio_to_pose"]).__getitem__([0])
+"""
