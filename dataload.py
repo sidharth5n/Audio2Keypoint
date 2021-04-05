@@ -52,9 +52,16 @@ class a2kData(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, i):
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
         process_row, decode_pose = self.get_processor()
-        x_sample, y_sample = process_row(i)
-        Y = self.to_tensor(y_sample)
-        X = self.to_tensor(x_sample)
+        X, Y = [], []
+        for i in idx:
+            row = self.df.iloc[i]
+            x_sample, y_sample = process_row(row)
+            X.append(x_sample)
+            Y.append(y_sample)
+        Y = self.to_tensor(Y)
+        X = self.to_tensor(X)
         return X, Y
