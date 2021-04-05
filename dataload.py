@@ -18,7 +18,7 @@ class a2kData(Dataset):
         self.to_tensor = transforms.ToTensor()
 
     def get_processor(self):
-        processing_type = self.config["processor"]
+        processing_type = self.config["processor"] 
         f = self.audio_pose_mel_spect
         if processing_type == 'audio_to_pose':
             d = decode_pose_normalized_keypoints
@@ -28,7 +28,7 @@ class a2kData(Dataset):
             raise ValueError("Wrong Processor")
         return partial(f, self.config), d
 
-    def audio_pose_mel_spect(self, row):
+    def audio_pose_mel_spect(self,config, row):
         if "audio" in row:
             x = row["audio"]
         else:
