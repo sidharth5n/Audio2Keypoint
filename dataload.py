@@ -72,8 +72,8 @@ class a2kData(Dataset):
         Y = np.array(Y)
         X = np.array(X)
         """
-        Y = torch.FloatTensor(Y)
-        X = torch.FloatTensor(X)
+        Y = [torch.from_numpy(item).float() for item in Y]
+        X = [torch.from_numpy(item).float() for item in X]
         return X, Y
 
 """
