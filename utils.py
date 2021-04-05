@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio.functional as F_au
+from common.consts import CHIN_KEYPOINTS, LEFT_BROW_KEYPOINTS, RIGHT_BROW_KEYPOINTS, NOSE_KEYPOINTS,\
+    LEFT_EYE_KEYPOINTS, RIGHT_EYE_KEYPOINTS, OUTER_LIP_KEYPOINTS, INNER_LIP_KEYPOINTS
 
 def ConvLayer(in_channels, out_channels, kernel_size, stride, padding, type, norm = True):
     assert type in ['1D', '2D']
@@ -62,3 +64,17 @@ class KeyPointsRegLoss(nn.Module):
             fake_keypts_motion = to_motion_delta(fake_keypts).view(-1)
             loss += self.loss(real_keypts_motion, fake_keypts_motion) * self.lambda
         return loss
+
+def get_training_keypoints():
+    training_keypoints = []
+    training_keypoints.extend(CHIN_KEYPOINTS)
+    training_keypoints.extend(LEFT_BROW_KEYPOINTS)
+    training_keypoints.extend(RIGHT_BROW_KEYPOINTS)
+    training_keypoints.extend(NOSE_KEYPOINTS)
+    training_keypoints.extend(LEFT_EYE_KEYPOINTS)
+    training_keypoints.extend(RIGHT_EYE_KEYPOINTS)
+    training_keypoints.extend(OUTER_LIP_KEYPOINTS)
+    training_keypoints.extend(INNER_LIP_KEYPOINTS)
+    training_keypoints = sorted(list(set(training_keypoints)))
+    training_keypoints = torch.LongTensor(training_keypoints)
+    return training_keypoints
