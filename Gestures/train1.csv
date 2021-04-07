@@ -1,0 +1,2 @@
+,audio_fn,dataset,end,interval_id,pose_fn,speaker,start,video_fn
+0,./Gestures/human/train/audio/id0004462OEFEevKvs00001-00:00:00.040000-00:00:05.360000.wav,train,0:00:02.560000,id037619diQL48epnM00019,./Gestures/human/train/npz/id0004.npz,human,0:00:00.040000,id03761/9diQL48epnM/00019.mp4

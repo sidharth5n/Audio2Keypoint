@@ -2,13 +2,37 @@ import torch
 import torch.nn as nn
 from torch import optim
 from model import Audio2Keypoint
-from dataset import VoxKP
-from utils import KeyPointsRegLoss, keypoints_to_train
+# from dataset import VoxKP
+from utils import KeyPointsRegLoss, keypoints_to_train,_get_training_keypoints
+from config import get_config
+from common.pose_logic_lib import translate_keypoints, get_sample_output_by_config
+AUDIO_SHAPE = 67267
+import pandas as pd
+my_dict={"audio_fn":["./Gestures/human/train/audio/id0004462OEFEevKvs00001-00:00:00.040000-00:00:05.360000.wav"],
+"dataset":["train"],"end":["0:00:02.560000"],"interval_id":["id037619diQL48epnM00019"],
+"pose_fn":["./Gestures/human/train/npz/id0004.npz"],
+"speaker":["human"],"start":["0:00:00.040000"],"video_fn":["id03761/9diQL48epnM/00019.mp4"]}
+df=pd.DataFrame.from_dict(my_dict)
+df.to_csv(path_or_buf='Gestures/train1.csv')
+from dataload import a2kData
+import argparse
 
-data_loader =
+from config import create_parser
 
+parser = argparse.ArgumentParser(description='train speaker specific model')
+parser = create_parser(parser)
+args = parser.parse_args()
+
+# //read_csv here
+
+configs = {
+    "audio_to_pose": {"num_keypoints": 136, "processor": "audio_to_pose", "flatten": False, "input_shape": [None, AUDIO_SHAPE]},
+    "audio_to_pose_inference": {"num_keypoints": 136, "processor": "audio_to_pose_inference", "flatten": False, "input_shape": [None, AUDIO_SHAPE]}
+}
+data_loader =  a2kData(df,"train",configs["audio_to_pose"])
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = Audio2Keypoint().to(device)
+model = Audio2Keypoint(args).to(device)
+
 
 keypts_regloss = KeyPointsRegLoss(args.reg_loss_type, args.d_input, args.lambda_motion_reg_loss)
 Disc_loss = nn.MSELoss()
@@ -22,14 +46,18 @@ G_optim = optim.Adam(model.generator.parameters(), lr = args.lr_g)
 # TODO : Checkpoint saving, resume training from checkpoint
 
 iteration = 0
-
-for epoch in range(start_epoch, epochs):
+start_epoch=1
+epochs=1
+cfg = get_config(args.config)
+for epoch in range(start_epoch, 2):
     for data in data_loader:
-        image, audio, real_pose = [x.to(device) for x in data]
-        img_enc_piv, fake_pose, real_enc, fake_enc, real_pose_score, fake_pose_score = model(image, audio, real_pose)
-
+        audio, real_pose = [x.to(device) for x in data]
+        image=real_pose[:,0]
+        image=torch.unsqueeze(image,1)
+        img_enc_piv, fake_pose, real_enc, fake_enc, real_pose_score, fake_pose_score = model(image.float(), audio, real_pose)
+        
         # remove base keypoint which is always [0,0]. Keeping it may ruin GANs training due discrete problems. etc.
-        training_keypoints = self._get_training_keypoints()
+        training_keypoints = _get_training_keypoints()
 
         train_real_pose = keypoints_to_train(real_pose, training_keypoints)
         train_real_pose = get_sample_output_by_config(train_real_pose, cfg)
