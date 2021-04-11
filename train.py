@@ -8,9 +8,9 @@ from utils import KeyPointsRegLoss, keypoints_to_train
 data_loader =
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = Audio2Keypoint().to(device)
+model = Audio2Keypoint(args).to(device)
 
-keypts_regloss = KeyPointsRegLoss(args.reg_loss_type, args.d_input, args.lambda_motion_reg_loss)
+Keypts_regloss = KeyPointsRegLoss(args.reg_loss_type, args.d_input, args.lambda_motion_reg_loss)
 Disc_loss = nn.MSELoss()
 Enc_loss = nn.TripletMarginLoss(margin = 0.5, p = 1)
 G_Enc_loss = nn.L1Loss()
@@ -25,22 +25,19 @@ iteration = 0
 
 for epoch in range(start_epoch, epochs):
     for data in data_loader:
-        image, audio, real_pose = [x.to(device) for x in data]
-        img_enc_piv, fake_pose, real_enc, fake_enc, real_pose_score, fake_pose_score = model(image, audio, real_pose)
+        audio, real_pose = [x.to(device) for x in data]
+        img_enc_piv, fake_pose, real_enc, fake_enc, real_pose_score, fake_pose_score, fake_pose_score_detached = model(audio, real_pose)
 
-        # remove base keypoint which is always [0,0]. Keeping it may ruin GANs training due discrete problems. etc.
-        training_keypoints = self._get_training_keypoints()
-
-        train_real_pose = keypoints_to_train(real_pose, training_keypoints)
+        train_real_pose = keypoints_to_train(real_pose, model.keypoints)
         train_real_pose = get_sample_output_by_config(train_real_pose, cfg)
-        train_fake_pose = keypoints_to_train(fake_pose, training_keypoints)
+        train_fake_pose = keypoints_to_train(fake_pose, model.keypoints)
 
         # Regression loss on motion or pose
-        pose_regloss = keypts_regloss(train_real_pose, train_fake_pose)
+        pose_regloss = Keypts_regloss(train_real_pose, train_fake_pose)
 
         # Compute discriminator loss and update D
         D_loss_real = Disc_loss(real_pose_score.new_ones(), real_pose_score)
-        D_loss_fake = Disc_loss(fake_pose_score.new_zeros(), fake_pose_score)
+        D_loss_fake = Disc_loss(fake_pose_score_detached.new_zeros(), fake_pose_score_detached)
         D_loss = D_loss_real + args.lambda_d * D_loss_fake
         D_optim.zero_grad()
         D_loss.backward()
@@ -48,16 +45,16 @@ for epoch in range(start_epoch, epochs):
 
         # Loss for training the generator from the global D - have I fooled the global D?
         D_loss_fake = Disc_loss(fake_pose_score.new_ones(), fake_pose_score)
-        # encoder loss and train encoder
+
+        # Compute encoder loss and update E
         E_enc_loss = Enc_loss(img_enc_piv, real_enc, fake_enc)
         E_loss = pose_regloss + D_loss_fake + E_enc_loss
         E_optim.zero_grad()
         E_loss.backward()
         E_optim.step()
 
-        # loss for generatar encoding
+        # Compute generator loss and update G
         G_enc_loss = G_Enc_loss(img_enc_piv, fake_enc)
-        # sum up ALL the losses for training the generator
         G_loss = pose_regloss + (args.lambda_gan * D_loss_fake) + (args.lambda_enc * G_enc_loss)
         G_optim.zero_grad()
         G_loss.backward()
