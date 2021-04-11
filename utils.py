@@ -5,30 +5,42 @@ import torchaudio.functional as F_au
 from common.consts import CHIN_KEYPOINTS, LEFT_BROW_KEYPOINTS, RIGHT_BROW_KEYPOINTS, NOSE_KEYPOINTS,\
     LEFT_EYE_KEYPOINTS, RIGHT_EYE_KEYPOINTS, OUTER_LIP_KEYPOINTS, INNER_LIP_KEYPOINTS
 
-def ConvLayer(in_channels, out_channels, kernel_size, stride, padding, type, norm = True):
+def ConvLayer(in_channels, out_channels, kernel_size, stride, padding, type, norm = True, seq = False):
     assert type in ['1D', '2D']
     conv = nn.Conv1d if type == '1D' else nn.Conv2d
     norm_ = nn.BatchNorm1d if type == '1D' else nn.BatchNorm2d
-    return nn.Sequential(conv(in_channels = in_channels,
+    layers = [conv(in_channels = in_channels,
                               out_channels = out_channels,
                               kernel_size = kernel_size,
                               stride = stride,
                               padding = padding),
-                         norm_(out_channels) if norm else lamba x: x,
-                         nn.LeakyReLU(0.2))
+              norm_(out_channels) if norm else lambda x: x,
+              nn.LeakyReLU(0.2)]
+    return nn.Sequential(*layers) if seq else layers
 
 def CatAndAdd(x, y, layer):
-    return layer(torch.repeat_interleave(x, 2, dim = 1) + y) # check dim
+    return layer(torch.repeat_interleave(x, 2, dim = 2) + y)
 
 def MelSpectrogram(audio):
+    """
+    Computes log mel spectrogram of audio input.
+    
+    Parameters
+    ----------
+    audio      : torch.tensor of shape (B, config.input_shape[1])
+
+    Returns
+    -------
+    input_data : torch.tensor of shape (B, 1, 418, 64)
+    """
     stft = torch.stft(audio, n_fft = 512, hop_length = 160, win_length = 400,
-                      window = torch.hann_window(win_length = 400, periodic = True),
-                      center = False).abs()
+                      window = torch.hann_window(window_length = 400, periodic = True),
+                      center = False, return_complex = True).abs().transpose(2,1)
     mel_spect_input = F_au.create_fb_matrix(stft.shape[2], n_mels = 64,
                                             f_min = 125.0, f_max = 7500.0,
                                             sample_rate = 16000)
-    input_data = torch.tensordot(stft, mel_spect_input, dim = 1)
-    input_data = torch.log(input_data + 1e-6).unsqueeze(-1)
+    input_data = torch.tensordot(stft, mel_spect_input, dims = 1)
+    input_data = torch.log(input_data + 1e-6).unsqueeze(1)
     return input_data
 
 def keypoints_to_train(poses, arr):
