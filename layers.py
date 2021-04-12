@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils import ConvLayer, CatAndAdd, MelSpectrogram, to_motion_delta
+from utils import ConvLayer, MelSpectrogram, to_motion_delta
 
 class ImageEncoderPIV(nn.Module):
     """
@@ -9,34 +9,54 @@ class ImageEncoderPIV(nn.Module):
     """
     def __init__(self):
         super(ImageEncoderPIV, self).__init__()
-        self.layers = nn.Sequential(ConvLayer(input_channels, 128, 3, 1, 1, '2D'),
-                                    ConvLayer(128, 128, 3, 1, 1, '2D'),
-                                    ConvLayer(128, 128, 3, 1, 1, '2D'),
-                                    ConvLayer(128, 128, 3, 1, 1, '2D'),
-                                    ConvLayer(128, 64, 3, 1, 1, '2D'),
-                                    ConvLayer(64, 64, 3, 1, 1, '2D'),
-                                    ConvLayer(64, 64, 3, 1, 1, '2D'),
-                                    ConvLayer(64, 32, 3, 1, 1, '2D'),
-                                    ConvLayer(32, 32, 3, 1, 1, '2D'))
+        self.layers = nn.Sequential(*ConvLayer(136, 128, 3, 1, 1, '2D'),
+                                    *ConvLayer(128, 128, 3, 1, 1, '2D'),
+                                    *ConvLayer(128, 128, 3, 1, 1, '2D'),
+                                    *ConvLayer(128, 128, 3, 1, 1, '2D'),
+                                    *ConvLayer(128, 64, 3, 1, 1, '2D'),
+                                    *ConvLayer(64, 64, 3, 1, 1, '2D'),
+                                    *ConvLayer(64, 64, 3, 1, 1, '2D'),
+                                    *ConvLayer(64, 32, 3, 1, 1, '2D'),
+                                    *ConvLayer(32, 32, 3, 1, 1, '2D'))
 
     def forward(self, image):
-        return self.layers(image).mean(dim = 2) # check dim
+        """
+        Parameters
+        ----------
+        image       : torch.tensor of shape (B, 136, L)
+
+        Returns
+        -------
+        img_enc_piv : torch.tensor of shape (B, 32, L)
+        """
+        image = image.unsqueeze(-1) #(B,136,L,1)
+        img_enc_piv = self.layers(image).mean(dim = 3)
+        return img_enc_piv
 
 class ImageEncoderPV(nn.Module):
     """
     Pose Variant Encoder
     """
     def __init__(self):
-        super(ImageEncoderPV, self).__init_()
-        self.conv1 = ConvLayer(in_channels, 128, 3, 1, 1, '1D')
-        self.conv2 = ConvLayer(in_channels, 128, 4, 2, padding = , '1D') #padding such that same size
-        self.conv3 = ConvLayer(in_channels, 128, 3, 1, 1, '1D')
+        super(ImageEncoderPV, self).__init__()
+        self.conv1 = ConvLayer(136, 128, 3, 1, 1, '1D', seq = True)
+        self.conv2 = ConvLayer(128, 128, 4, 2, 1, '1D', seq = True)
+        self.conv3 = ConvLayer(128, 128, 3, 1, 1, '1D', seq = True)
 
     def forward(self, image):
+        """
+        Parameters
+        ----------
+        image : torch.tensor of shape (B, 136, 1)
+
+        Returns
+        -------
+        x     : torch.tensor of shape (B, 128, 2)
+        """
         x = self.conv1(image)
-        x = torch.repeat_interleave(x, 2, dim = 1) # check dim
+        x = torch.repeat_interleave(x, 2, dim = 2)
         x = self.conv2(x)
-        x = torch.repeat_interleave(x, 2, dim = 1) # check dim
+        x = torch.repeat_interleave(x, 2, dim = 2)
         x = self.conv3(x)
         return x
 
@@ -44,59 +64,82 @@ class AudioEncoder(nn.Module):
 
     def __init__(self):
         super(AudioEncoder, self).__init__()
-        self.downsampling_blocks1to4 = nn.Sequential(ConvLayer(in_channels, 64, 3, 1, 1, '2D'),
-                                                     ConvLayer(64, 64, 4, 2, padding, '2D'), #padding such that same size
-                                                     ConvLayer(64, 128, 3, 1, 1, '2D'),
-                                                     ConvLayer(128, 64, 4, 2, padding, '2D'), #padding such that same size
-                                                     ConvLayer(64, 256, 3, 1, 1, '2D'),
-                                                     ConvLayer(256, 256, 4, 2, padding, '2D'), #padding such that same size
-                                                     ConvLayer(256, 256, 3, 1, 1, '2D'),
-                                                     ConvLayer(256, 256, (3, 8), 1, padding, '2D')) #padding such that same size
-        self.downsampling_blocks5to10 = nn.ModuleList([nn.Sequential(ConvLayer(in_channels, 256, 3, 1, 1, '1D'),
-                                                                     ConvLayer(256, 256, 3, 1, 1, '1D')),
-                                                       ConvLayer(in_channels, 256, 4, 2, padding, '1D'), #padding such that same size
-                                                       ConvLayer(in_channels, 256, 4, 2, padding, '1D'), #padding such that same size,
-                                                       ConvLayer(in_channels, 256, 4, 2, padding, '1D'), #padding such that same size
-                                                       ConvLayer(in_channels, 256, 4, 2, padding, '1D'), #padding such that same size
-                                                       ConvLayer(in_channels, 256, 4, 2, padding, '1D')) #padding such that same size
+        self.downsampling_blocks1to4 = nn.Sequential(*ConvLayer(1, 64, 3, 1, 1, '2D'),
+                                                     *ConvLayer(64, 64, 4, 2, 1, '2D'),
+                                                     *ConvLayer(64, 128, 3, 1, 1, '2D'),
+                                                     *ConvLayer(128, 64, 4, 2, 1, '2D'),
+                                                     *ConvLayer(64, 256, 3, 1, 1, '2D'),
+                                                     *ConvLayer(256, 256, 4, 2, 1, '2D'),
+                                                     *ConvLayer(256, 256, 3, 1, 1, '2D'),
+                                                     *ConvLayer(256, 256, (3, 8), 1, 0, '2D'))
+        self.downsampling_blocks5to10 = nn.ModuleList([nn.Sequential(*ConvLayer(256, 256, 3, 1, 1, '1D'),
+                                                                     *ConvLayer(256, 256, 3, 1, 1, '1D')),
+                                                       ConvLayer(256, 256, 4, 2, 1, '1D', seq = True),
+                                                       ConvLayer(256, 256, 4, 2, 1, '1D', seq = True),
+                                                       ConvLayer(256, 256, 4, 2, 1, '1D', seq = True),
+                                                       ConvLayer(256, 256, 4, 2, 1, '1D', seq = True),
+                                                       ConvLayer(256, 256, 4, 2, 1, '1D', seq = True)
                                                       ])
-        self.conv = ConvLayer(in_channels, 256, 3, 1, 1, '1D')
-        self.convs = nn.ModuleList([ConvLayer(in_channels, 256, 3, 1, 1, '1D'),
-                                    ConvLayer(256, 256, 3, 1, 1, '1D'),
-                                    ConvLayer(256, 256, 3, 1, 1, '1D'),
-                                    ConvLayer(256, 256, 3, 1, 1, '1D'),
-                                    ConvLayer(256, 256, 3, 1, 1, '1D')])
+        self.conv = ConvLayer(416, 256, 3, 1, 1, '1D', seq = True)
+        self.convs = nn.ModuleList([ConvLayer(256, 256, 3, 1, 1, '1D', seq = True),
+                                    ConvLayer(256, 256, 3, 1, 1, '1D', seq = True),
+                                    ConvLayer(256, 256, 3, 1, 1, '1D', seq = True),
+                                    ConvLayer(256, 256, 3, 1, 1, '1D', seq = True),
+                                    ConvLayer(256, 256, 3, 1, 1, '1D', seq = True)])
 
     def forward(self, audio, pose, img_enc_pv, img_enc_piv):
-        x = self.downsampling_blocks1to4(audio)
-        x = F.interpolate(x, (pose.shape[1], 1), mode = 'bilinear', align_corners = False).squeeze(2) # check dim
+        """
+        Parameters
+        ----------
+        audio         : torch.tensor of shape (B, 1, 418, 64)
+        pose          : torch.tensor of shape (B, 136, 64)
+        image_enc_pv  : torch.tensor of shape (B, 128, 2)
+        image_enc_piv : torch.tensor of shape (B, 32, 2)
+
+        Returns
+        -------
+        x             : torch.tensor of shape (B, 256, 64)
+        """
+        x = self.downsampling_blocks1to4(audio) #(B,256,50,1)
+        x = F.interpolate(x, (pose.shape[2], 1), mode = 'bilinear', align_corners = False).squeeze(-1) #(B,256,64)
         outs = list()
         for layer in self.downsampling_blocks5to10:
             x = layer(x)
             outs.append(x)
         outs.reverse()
-        x = torch.cat([x, img_enc_pv, img_enc_piv], dim = 2) #check dim
-        x = self.conv(x)
+        # (B,256,2), (B,128,2), (B,32,2)
+        x = torch.cat([x, img_enc_pv, img_enc_piv], dim = 1) #(B,416,2)
+        x = self.conv(x) #(B,256,2)
         for y, layer in zip(outs[1:], self.convs):
-            x = CatAndAdd(x, y, layer)
+            x = torch.repeat_interleave(x, 2, dim = 2)
+            x = layer(x + y)
         return x
 
 class Decoder(nn.Module):
     def __init__(self):
         super(Decoder, self).__init__()
-        self.layers = nn.Sequential(ConvLayer(input_channels, 256, 3, 1, 1, '1D'),
-                                    ConvLayer(256, 256, 3, 1, 1, '1D'),
-                                    ConvLayer(256, 256, 3, 1, 1, '1D'),
-                                    ConvLayer(256, 256, 3, 1, 1, '1D'))
-        self.logits = nn.Conv1d(input_channels, 136, kernel_size = 1, stride = 1, padding = 0)
+        self.layers = nn.Sequential(*ConvLayer(256, 256, 3, 1, 1, '1D'),
+                                    *ConvLayer(256, 256, 3, 1, 1, '1D'),
+                                    *ConvLayer(256, 256, 3, 1, 1, '1D'),
+                                    *ConvLayer(256, 256, 3, 1, 1, '1D'))
+        self.logits = nn.Conv1d(256, 136, kernel_size = 1, stride = 1, padding = 0)
 
     def forward(self, audio_enc):
+        """
+        Parameters
+        ----------
+        audio_enc : torch.tensor of shape (B, 256, 64)
+
+        Returns
+        -------
+        logits    : torch.tensor of shape (B, 136, 64)
+        """
         dec = self.layers(audio_enc)
         logits = self.logits(dec)
         return logits
 
 class Discriminator(nn.Module):
-    def __init__(self, d_input):
+    def __init__(self, d_input, n_downsampling = 2):
         super(Discriminator, self).__init__()
         self.d_input = d_input
         # d motion or pose
@@ -105,22 +148,39 @@ class Discriminator(nn.Module):
         elif d_input == 'pose':
             self.motion_or_pose = lambda x : x
         elif d_input == 'both':
-            self.motion_or_pose = lambda x : torch.cat([x, to_motion_delta(x)], dim = 1) # check dim
+            self.motion_or_pose = lambda x : torch.cat([x, to_motion_delta(x)], dim = 2)
 
-        layers = list()
-        for i in range(n_downsampling+1):
-            if i == 0:
-                layers.append(ConvLayer(in_channels, 64, 4, 2, padding, '1D', False)) #padding such that same size
+        if d_input in ['motion', 'both']:
+            layers = [nn.ConstantPad1d((1, 2), 0), # TF uses asymmetrical padding
+                      *ConvLayer(134, 64, 4, 2, 0, '1D', False)]
+        else:
+            layers = ConvLayer(134, 64, 4, 2, 1, '1D', False)
+
+        for i in range(1, n_downsampling+1):
+            n = min(2**i, 8)
+            m = min(2**(i-1), 8)
+            if i != n_downsampling:
+                layers.extend(ConvLayer(64*m, 64*n, 4, 2, 1, '1D'))
             else:
-                n = min(2**i, 8)
-                m = min(2**(i-1), 8)
-                layers.append(ConvLayer(64*m, 64*n, 4, 1 if i == n_downsampling else 2, padding, '1D')) #padding such that same size
-        layers.append(nn.Conv1d(64*n, 1, 4, 1, padding)) #padding such that same size
-        self.layers = nn.Sequential(layers)
+                layers.extend([nn.ConstantPad1d((1, 2), 0), # TF uses asymmetrical padding
+                               *ConvLayer(64*m, 64*n, 4, 1, 0, '1D')])
+        layers.extend([nn.ConstantPad1d((1, 2), 0), # TF uses asymmetrical padding
+                      nn.Conv1d(64*n, 1, 4, 1, 0)])
+        self.layers = nn.Sequential(*layers)
 
     def forward(self, pose):
-        motion_or_pose = self.motion_or_pose(pose)
-        return self.layers(motion_or_pose)
+        """
+        Parameters
+        ----------
+        pose  : torch.tensor of shape (B, 134, 64)
+
+        Returns
+        -------
+        score : torch.tensor of shape (B, 16)
+        """
+        motion_or_pose = self.motion_or_pose(pose) #(B,134,63), (B,134,64) or (B,134,127)
+        score = self.layers(motion_or_pose).squeeze(1)
+        return score
 
 class Generator(nn.Module):
     def __init__(self):
@@ -130,9 +190,21 @@ class Generator(nn.Module):
         self.decoder = Decoder()
 
     def forward(self, audio, pose, image, image_enc_piv):
-        image_enc_pv = self.image_encoder_pv(image)
-        image_enc_piv = torch.repeat_interleave(image_enc_piv, 2, dim = 1) # check dim
-        audio_input = MelSpectrogram(audio)
-        audio_enc = self.audio_encoder(audio_input, pose, img_enc_pv, img_enc_piv)
-        out = self.decoder(audio_enc)
+        """
+        Parameters
+        ----------
+        audio         : torch.tensor of shape (B, config.input_shape[1])
+        pose          : torch.tensor of shape (B, 136, 64)
+        image         : torch.tensor of shape (B, 136, 1)
+        image_enc_piv : torch.tensor of shape (B, 32, 1)
+
+        Returns
+        -------
+        out           : torch.tensor of shape (B, 136, 64)
+        """
+        image_enc_pv = self.image_encoder_pv(image) #(B,128,2)
+        image_enc_piv = torch.repeat_interleave(image_enc_piv, 2, dim = 2) #(B,32,2)
+        audio_input = MelSpectrogram(audio) #(B,1,418,64)
+        audio_enc = self.audio_encoder(audio_input, pose, img_enc_pv, img_enc_piv) #(B,256,64)
+        out = self.decoder(audio_enc) #(B,136,64)
         return out
