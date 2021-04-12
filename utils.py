@@ -24,7 +24,7 @@ def CatAndAdd(x, y, layer):
 def MelSpectrogram(audio):
     """
     Computes log mel spectrogram of audio input.
-    
+
     Parameters
     ----------
     audio      : torch.tensor of shape (B, config.input_shape[1])
@@ -33,13 +33,14 @@ def MelSpectrogram(audio):
     -------
     input_data : torch.tensor of shape (B, 1, 418, 64)
     """
+    device = audio.device
     stft = torch.stft(audio, n_fft = 512, hop_length = 160, win_length = 400,
-                      window = torch.hann_window(window_length = 400, periodic = True),
-                      center = False, return_complex = True).abs().transpose(2,1)
-    mel_spect_input = F_au.create_fb_matrix(stft.shape[2], n_mels = 64,
+                      window = torch.hann_window(window_length = 400, periodic = True).to(device),
+                      center = False, return_complex = True).abs()
+    mel_spect_input = F_au.create_fb_matrix(stft.shape[1], n_mels = 64,
                                             f_min = 125.0, f_max = 7500.0,
-                                            sample_rate = 16000)
-    input_data = torch.tensordot(stft, mel_spect_input, dims = 1)
+                                            sample_rate = 16000).to(device)
+    input_data = torch.tensordot(stft, mel_spect_input, dims = [[1], [0]])
     input_data = torch.log(input_data + 1e-6).unsqueeze(1)
     return input_data
 
