@@ -91,14 +91,14 @@ class AudioEncoder(nn.Module):
         """
         Parameters
         ----------
-        audio         : torch.tensor of shape (B, 1, 418, 64)
-        pose          : torch.tensor of shape (B, 136, 64)
-        image_enc_pv  : torch.tensor of shape (B, 128, 2)
-        image_enc_piv : torch.tensor of shape (B, 32, 2)
+        audio       : torch.tensor of shape (B, 1, 418, 64)
+        pose        : torch.tensor of shape (B, 136, 64)
+        img_enc_pv  : torch.tensor of shape (B, 128, 2)
+        img_enc_piv : torch.tensor of shape (B, 32, 2)
 
         Returns
         -------
-        x             : torch.tensor of shape (B, 256, 64)
+        x           : torch.tensor of shape (B, 256, 64)
         """
         x = self.downsampling_blocks1to4(audio) #(B,256,50,1)
         x = F.interpolate(x, (pose.shape[2], 1), mode = 'bilinear', align_corners = False).squeeze(-1) #(B,256,64)
@@ -189,21 +189,21 @@ class Generator(nn.Module):
         self.audio_encoder = AudioEncoder()
         self.decoder = Decoder()
 
-    def forward(self, audio, pose, image, image_enc_piv):
+    def forward(self, audio, pose, img, img_enc_piv):
         """
         Parameters
         ----------
-        audio         : torch.tensor of shape (B, config.input_shape[1])
-        pose          : torch.tensor of shape (B, 136, 64)
-        image         : torch.tensor of shape (B, 136, 1)
-        image_enc_piv : torch.tensor of shape (B, 32, 1)
+        audio       : torch.tensor of shape (B, config.input_shape[1])
+        pose        : torch.tensor of shape (B, 136, 64)
+        img         : torch.tensor of shape (B, 136, 1)
+        img_enc_piv : torch.tensor of shape (B, 32, 1)
 
         Returns
         -------
-        out           : torch.tensor of shape (B, 136, 64)
+        out         : torch.tensor of shape (B, 136, 64)
         """
-        image_enc_pv = self.image_encoder_pv(image) #(B,128,2)
-        image_enc_piv = torch.repeat_interleave(image_enc_piv, 2, dim = 2) #(B,32,2)
+        img_enc_pv = self.image_encoder_pv(img) #(B,128,2)
+        img_enc_piv = torch.repeat_interleave(img_enc_piv, 2, dim = 2) #(B,32,2)
         audio_input = MelSpectrogram(audio) #(B,1,418,64)
         audio_enc = self.audio_encoder(audio_input, pose, img_enc_pv, img_enc_piv) #(B,256,64)
         out = self.decoder(audio_enc) #(B,136,64)
