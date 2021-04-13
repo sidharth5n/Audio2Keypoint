@@ -43,6 +43,8 @@ class a2kData(Dataset):
         y = normalize_relative_keypoints(y, row['speaker'])
         if "flatten" in self.config and self.config["flatten"]:
             y = y.flatten()
+        else:
+            y = np.swapaxes(y, 1, 0)
         return x, y
 
     def preprocess_x(self, x):
