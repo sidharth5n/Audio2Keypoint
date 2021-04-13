@@ -13,12 +13,14 @@ from common.pose_logic_lib import normalize_relative_keypoints, preprocess_to_re
 
 class a2kData(Dataset):
     def __init__(self, df, set_name, config):
+        # Need to add condition for speaker if needed
+        # see sid's master/dataload.py
         self.df = df[df['dataset'] == set_name]
         self.config = config
-        self.to_tensor = transforms.ToTensor()
+        self.process_row, self.decode_pose = self.get_processor()
 
     def get_processor(self):
-        processing_type = "audio_to_pose"  # self.config["processor"]
+        processing_type = self.config["processor"]
         f = self.audio_pose_mel_spect
         if processing_type == 'audio_to_pose':
             d = decode_pose_normalized_keypoints
@@ -26,7 +28,6 @@ class a2kData(Dataset):
             d = decode_pose_normalized_keypoints_no_scaling
         else:
             raise ValueError("Wrong Processor")
-        # return partial(f, self.config), d
         return f, d
 
     def audio_pose_mel_spect(self, row):
@@ -54,22 +55,19 @@ class a2kData(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        # if torch.is_tensor(idx):
-        # idx = idx.tolist()
-        idx = [idx]
-        process_row, decode_pose = self.get_processor()
-        X, Y = [], []
-        for i in idx:
-            row = self.df.iloc[i]
-            x_sample, y_sample = process_row(row)
-            y_sample = y_sample.T
-            X.append(x_sample)
-            Y.append(y_sample)
-        # Y = self.to_tensor(Y)
-        # X = self.to_tensor(X)
-        X = np.array(X)
-        Y = np.array(Y)
-        Y = torch.from_numpy(Y)  # .float() for item in Y
-
-        X = torch.from_numpy(X)  # .float() for item in X
+        # idx = [idx]
+        # process_row, decode_pose = self.get_processor()
+        # X, Y = [], []
+        # for i in idx:
+        #     row = self.df.iloc[i]
+        #     x_sample, y_sample = process_row(row)
+        #     y_sample = y_sample.T
+        #     X.append(x_sample)
+        #     Y.append(y_sample)
+        # Y = [torch.from_numpy(item).float() for item in Y]
+        # X = [torch.from_numpy(item).float() for item in X]
+        row = self.df.iloc[idx]
+        x_sample, y_sample = self.process_row(row)
+        Y = torch.from_numpy(y_sample)
+        X = torch.from_numpy(x_sample)
         return X, Y
