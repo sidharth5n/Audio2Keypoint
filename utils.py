@@ -1,8 +1,6 @@
 import torch
 import functools
 import numpy as np
-# from tensorflow.contrib.signal.python.ops import window_ops
-# import tensorflow as tf
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio.functional as F_au
@@ -69,38 +67,6 @@ def MelSpectrogram(audio):
     input_data = torch.log(input_data + 1e-6).unsqueeze(1)
     print(input_data.shape)
     return input_data.float()
-# def tf_mel_spectograms(audio):
-#     stft = tf.signal.stft(
-#         audio,
-#         400,
-#         160,
-#         fft_length=512,
-#         window_fn=tf.signal.hann_window,
-#         pad_end=False,
-#         name=None
-#     )
-#     stft = tf.abs(stft)
-#     print("stft")
-#     print(stft.shape)
-#     mel_spect_input = tf.signal.linear_to_mel_weight_matrix(
-#         num_mel_bins=64,
-#         num_spectrogram_bins=tf.shape(stft)[2],
-#         sample_rate=16000,
-#         lower_edge_hertz=125.0,
-#         upper_edge_hertz=7500.0,
-#         dtype=tf.float32,
-#         name=None
-#     )
-#     print("mel_spect_input")
-#     print(mel_spect_input.shape)
-#     input_data = tf.tensordot(stft, mel_spect_input, 1)
-#     print("input_data")
-#     print(input_data.shape)
-#     input_data = tf.log(input_data + 1e-6)
-
-#     input_data = tf.expand_dims(input_data, -1)
-
-#     return input_data
 
 
 def keypoints_to_train(poses, arr):

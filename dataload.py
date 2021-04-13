@@ -2,6 +2,7 @@ from __future__ import print_function, division
 import os
 import threading
 import numpy as np
+import pandas as pd
 from functools import partial
 import torch
 from torch.utils.data import Dataset
@@ -12,9 +13,10 @@ from common.pose_logic_lib import normalize_relative_keypoints, preprocess_to_re
 
 
 class a2kData(Dataset):
-    def __init__(self, df, set_name, config):
-        # Need to add condition for speaker if needed
-        # see sid's master/dataload.py
+    def __init__(self,args, set_name, config):
+        df = pd.read_csv(args.traincsv)
+        if args.speaker != None:
+            df = df[df['speaker'] == args.speaker]
         self.df = df[df['dataset'] == set_name]
         self.config = config
         self.process_row, self.decode_pose = self.get_processor()

@@ -31,11 +31,12 @@ args = parser.parse_args()
 
 # //read_csv here
 
-configs = {
-    "audio_to_pose": {"num_keypoints": 136, "processor": "audio_to_pose", "flatten": False, "input_shape": [None, AUDIO_SHAPE]},
-    "audio_to_pose_inference": {"num_keypoints": 136, "processor": "audio_to_pose_inference", "flatten": False, "input_shape": [None, AUDIO_SHAPE]}
-}
-data_loader = a2kData(df, "train", configs["audio_to_pose"])
+# configs = {
+#     "audio_to_pose": {"num_keypoints": 136, "processor": "audio_to_pose", "flatten": False, "input_shape": [None, AUDIO_SHAPE]},
+#     "audio_to_pose_inference": {"num_keypoints": 136, "processor": "audio_to_pose_inference", "flatten": False, "input_shape": [None, AUDIO_SHAPE]}
+# }
+cfg = get_config(args.config)
+data_loader = a2kData(args,"train", cfg)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # model = Audio2Keypoint(args).to(device)
 
@@ -63,7 +64,7 @@ G_optim = optim.Adam(generator.parameters(), lr=args.lr_g)
 iteration = 0
 start_epoch = 1
 epochs = 1
-cfg = get_config(args.config)
+
 for epoch in range(start_epoch, 2):
     for data in data_loader:
         # print("training start")
