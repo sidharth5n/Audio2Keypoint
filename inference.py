@@ -20,7 +20,14 @@ configs = {
     "audio_to_pose": {"num_keypoints": 136, "processor": "audio_to_pose", "flatten": False, "input_shape": [None, AUDIO_SHAPE]},
     "audio_to_pose_inference": {"num_keypoints": 136, "processor": "audio_to_pose_inference", "flatten": False, "input_shape": [None, AUDIO_SHAPE]}
 }
-data_loader =  a2kData(df,"train",configs["audio_to_pose"])
+
+parser = argparse.ArgumentParser(description='train speaker specific model')
+parser = create_parser(parser)
+args = parser.parse_args()
+# cfg = get_config(args.config)
+data_loader = a2kData(args,"train", configs["audio_to_pose_inference"])
+# data_loader =  a2kData(df,"train",configs["audio_to_pose"])
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 for data in data_loader:
     print("inference started")
