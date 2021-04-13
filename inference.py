@@ -14,6 +14,7 @@ from dataload import a2kData
 import pandas as pd
 import torch
 AUDIO_SHAPE = 67267
+
 df=pd.read_csv("Gestures/train1.csv")
 configs = {
     "audio_to_pose": {"num_keypoints": 136, "processor": "audio_to_pose", "flatten": False, "input_shape": [None, AUDIO_SHAPE]},
@@ -34,25 +35,25 @@ for data in data_loader:
     # padded_pose_shape = pose_shape + (2**6) - pose_shape%(2**)
     # padded_audio_shape = padded_pose_shape * SR / 25
     # padded_audio = np.pad(audio, [0, padded_audio_shape - audio.shape[0]], mode='reflect')
-
     # cfg = get_config(args.config)
-    
+
     model = Generator().to(device)
-    model.load_state_dict(torch.load('/home/btp/pg_btp_1/Aditya/Audio2Keypoint/tmp/g_w'))
+    model.load_state_dict(torch.load('/home/btp/pg_btp_1/Aditya/Audio2Keypoint1/tmp/g_w'))
     encoder = ImageEncoderPIV().to(device)
-    encoder.load_state_dict(torch.load('/home/btp/pg_btp_1/Aditya/Audio2Keypoint/tmp/e_w'))
+    encoder.load_state_dict(torch.load('/home/btp/pg_btp_1/Aditya/Audio2Keypoint1/tmp/e_w'))
     image=real_pose[:,:,0]
     image=image.unsqueeze(-1)
     input_enc_piv=encoder(image)
     output_keypoints = model(audio,real_pose,image,input_enc_piv)
-    print("hello")
-    print(real_pose.shape)
-    # output_keypoints = output_keypoints[0].squeeze(0)
-    real_pose = real_pose.reshape((64,2,68))
 
+    # real_pose = real_pose[:,:,1]
+    # real_pose = real_pose.reshape((1,2,68))
+    
+    # print(real_pose.shape)
     # if args.checkpoint:
     #     pgan.restore(args.checkpoint, scope_list=["generator", "encoder", "discriminator"])
     # else:
+
     #     print "No Checkpoint provided."
     # padded_pred_kpts = pgan.predict_audio(padded_audio, cfg, args.speaker, [0,0])
     # padded_pred_kpts = translate_keypoints(padded_pred_kpts, [900, 290])
@@ -79,7 +80,7 @@ for data in data_loader:
     #     input_kp = padded_pred_kpts[-1].reshape((1, 136))
     #     print(padded_pred_kpts.shape)
     # pred_kpts = final_pred_kpts[:pose_shape]
-    np.save('check1.npy',real_pose.squeeze(0).cpu().detach().numpy())
+    np.save('check1.npy',real_pose.cpu().detach().numpy())
     # print('SAVED!')
     # tmp_output_dir = 'tmp/'
     # mute = os.path.join(tmp_output_dir, 'mute_pred.mp4')

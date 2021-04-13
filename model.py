@@ -1,16 +1,19 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from layers import ImageEncoderPIV, Generator,Generator2 ,Discriminator
+from layers import ImageEncoderPIV, Generator, Generator2, Discriminator
 from utils import keypoints_to_train
+from common.consts import *
+from common.pose_logic_lib import get_sample_output_by_config
+
 
 class Audio2Keypoint(nn.Module):
-    def __init__(self, args, seq_len = 64,training=True):
+    def __init__(self, args, seq_len=64, training=True):
         super(Audio2Keypoint, self).__init__()
         self.encoder = ImageEncoderPIV()
         self.generator = Generator()
         self.discriminator = Discriminator(args.d_input)
-        self.training=training
+        self.training = training
 
     def forward(self, image, audio, real_pose):
         img_enc_piv = self.encoder(image)
@@ -20,7 +23,7 @@ class Audio2Keypoint(nn.Module):
             # TODO : Check whether these encoder lines are required during inference
             real_enc = self.encoder(real_pose)
             fake_enc = self.encoder(fake_pose)
-            D_training_keypoints = self._get_training_keypoints() # get full body keypoints
+            D_training_keypoints = self._get_training_keypoints()  # get full body keypoints
             D_real_pose = keypoints_to_train(real_pose, D_training_keypoints)
             real_pose_score = self.discriminator(D_real_pose)
             D_fake_pose = keypoints_to_train(fake_pose, D_training_keypoints)
@@ -44,12 +47,13 @@ class Audio2Keypoint(nn.Module):
         return training_keypoints
 
 
+# This class Audio2Keypoint2 has errors
 class Audio2Keypoint2(nn.Module):
-    def __init__(self, args, seq_len = 64,training=True):
+    def __init__(self, args, seq_len=64, training=True):
         super(Audio2Keypoint, self).__init__()
         self.generator = Generator2()
         self.discriminator = Discriminator(args.d_input)
-        self.training=training
+        self.training = training
 
     def forward(self, image, audio, real_pose):
         # img_enc_piv = self.encoder(image)
@@ -59,14 +63,14 @@ class Audio2Keypoint2(nn.Module):
             # TODO : Check whether these encoder lines are required during inference
             # real_enc = self.encoder(real_pose)
             # fake_enc = self.encoder(fake_pose)
-            D_training_keypoints = self._get_training_keypoints() # get full body keypoints
+            D_training_keypoints = self._get_training_keypoints()  # get full body keypoints
             D_real_pose = keypoints_to_train(real_pose, D_training_keypoints)
             D_real_pose = get_sample_output_by_config(D_real_pose, cfg)
             real_pose_score = self.discriminator(D_real_pose)
             D_fake_pose = keypoints_to_train(fake_pose, D_training_keypoints)
-            train_real_pose=train_real_pose[:,:,0:8]
+            train_real_pose = train_real_pose[:, :, 0:8]
             fake_pose_score = self.discriminator(D_fake_pose)
-            return D_real_pose,D_fake_pose,real_pose_score, fake_pose_score
+            return D_real_pose, D_fake_pose, real_pose_score, fake_pose_score
         else:
             return fake_pose_score
 
@@ -82,4 +86,4 @@ class Audio2Keypoint2(nn.Module):
         training_keypoints.extend(INNER_LIP_KEYPOINTS)
 
         training_keypoints = sorted(list(set(training_keypoints)))
-        return training_keypoints                                                                                              
+        return training_keypoints

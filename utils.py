@@ -10,57 +10,61 @@ from common.consts import CHIN_KEYPOINTS, LEFT_BROW_KEYPOINTS, RIGHT_BROW_KEYPOI
     LEFT_EYE_KEYPOINTS, RIGHT_EYE_KEYPOINTS, OUTER_LIP_KEYPOINTS, INNER_LIP_KEYPOINTS, POSE_SAMPLE_SHAPE, G_SCOPE, D_SCOPE, E_SCOPE, SR
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-def _get_training_keypoints():
-        training_keypoints = []
-        training_keypoints.extend(CHIN_KEYPOINTS)
-        training_keypoints.extend(LEFT_BROW_KEYPOINTS)
-        training_keypoints.extend(RIGHT_BROW_KEYPOINTS)
-        training_keypoints.extend(NOSE_KEYPOINTS)
-        training_keypoints.extend(LEFT_EYE_KEYPOINTS)
-        training_keypoints.extend(RIGHT_EYE_KEYPOINTS)
-        training_keypoints.extend(OUTER_LIP_KEYPOINTS)
-        training_keypoints.extend(INNER_LIP_KEYPOINTS)
-        
-        training_keypoints = sorted(list(set(training_keypoints)))
-        return training_keypoints
 
-def ConvLayer(in_channels, out_channels, kernel_size, stride, padding, type, norm = True):
+
+def _get_training_keypoints():
+    training_keypoints = []
+    training_keypoints.extend(CHIN_KEYPOINTS)
+    training_keypoints.extend(LEFT_BROW_KEYPOINTS)
+    training_keypoints.extend(RIGHT_BROW_KEYPOINTS)
+    training_keypoints.extend(NOSE_KEYPOINTS)
+    training_keypoints.extend(LEFT_EYE_KEYPOINTS)
+    training_keypoints.extend(RIGHT_EYE_KEYPOINTS)
+    training_keypoints.extend(OUTER_LIP_KEYPOINTS)
+    training_keypoints.extend(INNER_LIP_KEYPOINTS)
+
+    training_keypoints = sorted(list(set(training_keypoints)))
+    return training_keypoints
+
+
+def ConvLayer(in_channels, out_channels, kernel_size, stride, padding, type, norm=True):
     assert type in ['1D', '2D']
     if type == '1D':
-        return nn.Sequential(nn.Conv1d(in_channels = in_channels,
-                              out_channels = out_channels,
-                              kernel_size = kernel_size,
-                              stride = stride,
-                              padding = padding),
-                        #  nn.BatchNorm1d(out_channels),
-                         nn.LeakyReLU(0.2))
+        return nn.Sequential(nn.Conv1d(in_channels=in_channels,
+                                       out_channels=out_channels,
+                                       kernel_size=kernel_size,
+                                       stride=stride,
+                                       padding=padding),
+                             #  nn.BatchNorm1d(out_channels),
+                             nn.LeakyReLU(0.2))
     else:
-        return nn.Sequential(nn.Conv2d(in_channels = in_channels,
-                              out_channels = out_channels,
-                              kernel_size = kernel_size,
-                              stride = stride,
-                              padding = padding),
-                        #  nn.BatchNorm2d(out_channels),
-                         nn.LeakyReLU(0.2))
-
+        return nn.Sequential(nn.Conv2d(in_channels=in_channels,
+                                       out_channels=out_channels,
+                                       kernel_size=kernel_size,
+                                       stride=stride,
+                                       padding=padding),
+                             #  nn.BatchNorm2d(out_channels),
+                             nn.LeakyReLU(0.2))
 
 
 def CatAndAdd(x, y, layer):
-    return layer(torch.cat([x, x], dim = 1) + y) # check dim
+    return layer(torch.cat([x, x], dim=1) + y)  # check dim
+
 
 def MelSpectrogram(audio):
     print(audio.shape)
-    stft = torch.stft(audio, n_fft = 512, hop_length = 160, win_length = 400,
-                      window = torch.hann_window(window_length=400,periodic = True).to(device),
-                      center = False).abs()
-    stft=stft[:,:,:,0]
-    mel_spect_input = F_au.create_fb_matrix(stft.shape[1], n_mels = 64,
-                                            f_min = 125.0, f_max = 7500.0,
-                                            sample_rate = 16000)
-    mel_spect_input=mel_spect_input.to(device)
+    stft = torch.stft(audio, n_fft=512, hop_length=160, win_length=400,
+                      window=torch.hann_window(
+                          window_length=400, periodic=True).to(device),
+                      center=False).abs()
+    stft = stft[:, :, :, 0]
+    mel_spect_input = F_au.create_fb_matrix(stft.shape[1], n_mels=64,
+                                            f_min=125.0, f_max=7500.0,
+                                            sample_rate=16000)
+    mel_spect_input = mel_spect_input.to(device)
     print(stft.shape)
     print(mel_spect_input.shape)
-    input_data = torch.tensordot(stft, mel_spect_input, dims = [[1],[0]])
+    input_data = torch.tensordot(stft, mel_spect_input, dims=[[1], [0]])
     print(input_data.shape)
     input_data = torch.log(input_data + 1e-6).unsqueeze(1)
     print(input_data.shape)
@@ -93,32 +97,22 @@ def MelSpectrogram(audio):
 #     print("input_data")
 #     print(input_data.shape)
 #     input_data = tf.log(input_data + 1e-6)
-    
+
 #     input_data = tf.expand_dims(input_data, -1)
 
 #     return input_data
 
+
 def keypoints_to_train(poses, arr):
     shape = poses.shape
-    print(shape)
-    reshaped = poses.view((shape[0], shape[2], 2, 68))
-    # print("hello")
-    # print(reshaped.shape)
-    # required_keypoints= reshaped.select(0, index=arr, dim=2)
-    # arr=torch.LongTensor(arr)
-    # reshaped = tf.reshape(poses, (poses.shape[0], shape[1], 2, 68))
-    # list_=np.array([68,])
-    # for i in arr:
-    #     np.append(list_,reshaped[:,:,:,i].numpy())
-    # # print(len(list_))
-    # required_keypoints=torch.FloatTensor(list_)
-    # reshaped=tf.gather(reshaped, indices=arr, axis=2)
-    # required_keypoints = torch.gather(reshaped, dim=2,index = arr)
-    
-    # check this line
-    
-    required_keypoints = reshaped.view((shape[0], 2*(len(arr)+1),shape[2]))
-    return required_keypoints
+    poses = poses.permute(0, 2, 1)
+    reshaped = poses.reshape((shape[0], shape[2], 2, 68))
+    # required_keypoints = torch.gather(reshaped, index = arr, dim = 3)
+    required_keypoints = reshaped[..., arr]
+    required_keypoints = required_keypoints.reshape(
+        (shape[0], shape[2], 2*len(arr)))
+    return required_keypoints.permute(0, 2, 1)
+
 
 def to_motion_delta(pose_batch):
     shape = pose_batch.shape
@@ -126,9 +120,13 @@ def to_motion_delta(pose_batch):
     diff = reshaped[:, 1:] - reshaped[:, :-1]
     diff = diff.view((-1, 63, shape[-1]))
     return diff
+
+
 def UpSampling1D(input):
-    input=torch.repeat_interleave(input,2,2)
+    input = torch.repeat_interleave(input, 2, 2)
     return input
+
+
 class KeyPointsRegLoss(nn.Module):
     def __init__(self, type='l1', loss_on='pose'):
         super(KeyPointsRegLoss, self).__init__()
@@ -146,5 +144,6 @@ class KeyPointsRegLoss(nn.Module):
         if self.loss_on in ['motion', 'both']:
             real_keypts_motion = to_motion_delta(real_keypts).view(-1)
             fake_keypts_motion = to_motion_delta(fake_keypts).view(-1)
-            loss += self.loss(real_keypts_motion, fake_keypts_motion) #* self.lambda
+            loss += self.loss(real_keypts_motion,
+                              fake_keypts_motion)  # * self.lambda
         return loss

@@ -2,17 +2,19 @@ import cv2
 import os
 import numpy as np
 
+
 def reshape_for_polyline(array):
     return np.array(array, np.int32).reshape((-1, 1, 2))
+
 
 os.makedirs('landmarks_t', exist_ok=True)
 # os.makedirs('original', exist_ok=True)
 datas = np.load("check.npy")
-count=0
+count = 0
 for data in datas:
-    black_image = np.zeros((256,256,3), np.uint8)
-    landmarks = [[data[0][0], data[1][0]]] 
-    for i in range(1,68):
+    black_image = np.zeros((256, 256, 3), np.uint8)
+    landmarks = [[data[0][0], data[1][0]]]
+    for i in range(1, 68):
         landmarks.append([data[0][i], data[1][i]])
     jaw = reshape_for_polyline(landmarks[0:17])
     left_eyebrow = reshape_for_polyline(landmarks[22:27])
@@ -37,17 +39,17 @@ for data in datas:
     cv2.polylines(black_image, [outer_lip], True, color, thickness)
     cv2.polylines(black_image, [inner_lip], True, color, thickness)
 
-    ## Display the resulting frame
+    # Display the resulting frame
     print(count)
     cv2.imwrite("tmp/encoder_weights/{}.png".format(count), black_image)
-    
+
     count += 1
 
 # path='/Users/adityamehndiratta/pix2pix-tensorflow/robert_test/images/'
 # dest='/Users/adityamehndiratta/pix2pix-tensorflow/robert_target/'
 # # i=0
 # for filename in os.listdir(path):
-    
+
 #     temp=filename[5:]
 #     temp=temp[:-4]
 #     x=(int(temp))
@@ -71,4 +73,3 @@ for data in datas:
 #     # i=i+1
 
 cv2.destroyAllWindows()
-
