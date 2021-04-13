@@ -1,9 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils import ConvLayer, MelSpectrogram, to_motion_delta
-from utils import ConvLayer, UpSampling1D
-
+from utils import ConvLayer, MelSpectrogram, to_motion_delta, UpSampling1D
 
 class ImageEncoderPIV(nn.Module):
     """
