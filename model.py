@@ -11,7 +11,7 @@ class Audio2Keypoint(nn.Module):
         self.generator = Generator()
         self.discriminator = Discriminator(args.d_input)
         self.register_buffer('keypoints', get_training_keypoints()) # get full body keypoints
-        self.init_weights([self.encoder, self.generator, self.discriminator])
+        self.__init_weights()
 
     def forward(self, audio, real_pose):
         """
@@ -47,8 +47,7 @@ class Audio2Keypoint(nn.Module):
         else:
             return fake_pose
 
-    def init_weights(self, models):
-        for model in models:
-            for p in model.parameters():
-                if p.dim() > 1:
-                    nn.init.xavier_uniform_(p)
+    def __init_weights(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
