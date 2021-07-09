@@ -41,7 +41,7 @@ class Audio2Keypoint(nn.Module):
         with torch.no_grad():
             image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
             img_enc_piv = self.encoder(image) #(B,32,1)
-            fake_pose = self.generator(audio_spect, real_pose, image, img_enc_piv) #(B,136,64)
+            fake_pose = self.generator(audio_spect, image, img_enc_piv, real_pose.shape[2]) #(B,136,64)
         D_real_pose = keypoints_to_train(real_pose, self.keypoints) #(B,134,64)
         real_pose_score = self.discriminator(D_real_pose) #(B,16)
         D_fake_pose = keypoints_to_train(fake_pose, self.keypoints)
@@ -75,7 +75,7 @@ class Audio2Keypoint(nn.Module):
         image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
         with torch.no_grad():
             img_enc_piv = self.encoder(image) #(B,32)
-        fake_pose = self.generator(audio_spect, real_pose, image, img_enc_piv) #(B,136,64)
+        fake_pose = self.generator(audio_spect, image, img_enc_piv, real_pose.shape[2]) #(B,136,64)
         real_enc = self.encoder(real_pose) #(B,32)
         fake_enc = self.encoder(fake_pose) #(B,32)
         D_fake_pose = keypoints_to_train(fake_pose, self.keypoints)
@@ -108,7 +108,7 @@ class Audio2Keypoint(nn.Module):
         """
         image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
         img_enc_piv = self.encoder(image) #(B,32)
-        fake_pose = self.generator(audio_spect, real_pose, image, img_enc_piv) #(B,136,64)
+        fake_pose = self.generator(audio_spect, image, img_enc_piv, real_pose.shape[2]) #(B,136,64)
         real_enc = self.encoder(real_pose) #(B,32)
         fake_enc = self.encoder(fake_pose) #(B,32)
         D_fake_pose = keypoints_to_train(fake_pose, self.keypoints)
@@ -138,7 +138,7 @@ class Audio2Keypoint(nn.Module):
         with torch.no_grad():
             image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
             img_enc_piv = self.encoder(image) #(B,32)
-            fake_pose = self.generator(audio_spect, real_pose, image, img_enc_piv) #(B,136,64)
+            fake_pose = self.generator(audio_spect, image, img_enc_piv, real_pose.shape[2]) #(B,136,64)
             fake_enc = self.encoder(fake_pose) #(B,32)
             D_fake_pose = keypoints_to_train(fake_pose, self.keypoints)
             fake_pose_score = self.discriminator(D_fake_pose)
