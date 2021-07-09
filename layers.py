@@ -105,8 +105,8 @@ class AudioEncoder(nn.Module):
 
         Returns
         -------
-        x           : torch.tensor of shape (B, 256, 64)
-                      Audio encoding
+        x             : torch.tensor of shape (B, 256, 64)
+                        Audio encoding
         """
         x = self.downsampling_blocks1to4(audio_spect) #(B,256,50,1)
         x = F.interpolate(x, (temporal_size, 1), mode = 'bilinear', align_corners = False).squeeze(-1) #(B,256,64)
@@ -206,8 +206,6 @@ class Generator(nn.Module):
         ----------
         audio_spect   : torch.tensor of shape (B, 1, 418, 64)
                         Mel spectrogram of audio
-        pose          : torch.tensor of shape (B, 136, 64)
-                        Ground truth pose
         img           : torch.tensor of shape (B, 136, 1)
                         Input image
         img_enc_piv   : torch.tensor of shape (B, 32, 1)
