@@ -2,87 +2,110 @@ from __future__ import print_function, division
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import Dataset
+import torch.utils.data as data
 
-from common.pose_logic_lib import normalize_relative_keypoints, preprocess_to_relative, \
-    decode_pose_normalized_keypoints, decode_pose_normalized_keypoints_no_scaling
+from utils import preprocess_to_relative, normalize_relative_keypoints
 
-class a2kData(Dataset):
-    def __init__(self, args, set_name, config):
+class VoxKP(data.Dataset):
+    def __init__(self, args, split):
         df = pd.read_csv(args.train_csv)
         if args.speaker != None:
             df = df[df['speaker'] == args.speaker]
-        self.df = df[df['dataset'] == set_name]
-        self.config = config
-        self.process_row, self.decode_pose = self.get_processor()
-
-    def get_processor(self):
-        processing_type = self.config["processor"]
-        f = self.audio_pose_mel_spect
-        if processing_type == 'audio_to_pose':
-            d = decode_pose_normalized_keypoints
-        elif processing_type == 'audio_to_pose_inference':
-            d = decode_pose_normalized_keypoints_no_scaling
-        else:
-            raise ValueError("Wrong Processor")
-        return f, d
-
-    def audio_pose_mel_spect(self, row):
-        if "audio" in row:
-            x = row["audio"]
-        else:
-            arr = np.load(row['pose_fn'])
-            x = arr["audio"]
-        x = self.preprocess_x(x)
-        y = preprocess_to_relative(arr['pose'])
-        y = normalize_relative_keypoints(y, row['speaker'])
-        if "flatten" in self.config and self.config["flatten"]:
-            y = y.flatten()
-        else:
-            y = np.swapaxes(y, 2, 1)
-        return x, y
-
-    def preprocess_x(self, x):
-        """
-        Zero pads audio file at the end to fixed size.
-
-        Parameters
-        ----------
-        x : numpy.ndarray of shape (L,)
-
-        Returns
-        -------
-        x : numpy.ndarray of shape (config.input_shape[1],)
-        """
-        if len(x) > self.config['input_shape'][1]:
-            x = x[:self.config['input_shape'][1]]
-        elif len(x) < self.config['input_shape'][1]:
-            x = np.pad(x, [0, self.config['input_shape'][1] - len(x)],
-                       mode='constant', constant_values=0)
-        return x
+        self.df = df[df['dataset'] == split]
+        self.flatten = args.flatten
+        self.indices = [*range(len(self.df))]
 
     def __len__(self):
         return len(self.df)
 
     def __getitem__(self, idx):
         """
-        X : torch.tensor of shape (config.input_shape[1],)
-        Y : torch.tensor of shape (64, 136)
+        audio_spect : torch.tensor of shape (1, 418, 64)
+        real_pose : torch.tensor of shape (136, 64)
         """
-        row = self.df.iloc[idx]
-        x_sample, y_sample = self.process_row(row)
-        Y = torch.from_numpy(y_sample)
-        X = torch.from_numpy(x_sample)
-        return X, Y
+        row = self.df.iloc[self.indices[idx]]
+        arr = np.load(row['pose_fn'])
+        audio_spect = arr['melspect']
+        audio_spect = np.expand_dims(audio_spect, 0) # Adding a channel (1, 418, 64)
+        real_pose = preprocess_to_relative(arr['pose'])
+        real_pose = normalize_relative_keypoints(real_pose, row['speaker'])
+        real_pose = real_pose.flatten() if self.flatten else np.swapaxes(real_pose, 1, 0)
+        real_pose = torch.from_numpy(real_pose.astype(np.float32))
+        audio_spect = torch.from_numpy(audio_spect)
+        return audio_spect, real_pose
 
-# import pandas as pd
-# df = pd.read_csv("train.csv")
-AUDIO_SHAPE = 67267
-configs = {
-    "input_shape": [None, AUDIO_SHAPE],
-    "audio_to_pose": {"num_keypoints": 136, "processor": "audio_to_pose", "flatten": False, "input_shape": [None, AUDIO_SHAPE]},
-    "audio_to_pose_inference": {"num_keypoints": 136, "processor": "audio_to_pose_inference", "flatten": False, "input_shape": [None, AUDIO_SHAPE]}
-}
+class SubsetSampler(data.sampler.Sampler):
 
-# path = r"C:\Users\sidhu\Desktop\train.csv"
-mydata = a2kData(args, "train", configs["audio_to_pose"]).__getitem__([0])
+    def __init__(self, end, start = 0):
+        """
+        Parameters
+        ----------
+        end   : int
+                Last index
+        start : int, optional
+                Starting index. Default is 0.
+        """
+        self.start = start
+        self.end = end
+
+    def __iter__(self):
+        start = self.start
+        self.start = 0
+        return (i for i in range(start, self.end))
+
+    def __len__(self):
+        return self.end - self.start
+
+class DataLoader:
+
+    def __init__(self, args, split, params = None, length = 0, num_workers = 0):
+        self.split = split
+        self.shuffle = True if split == 'train' else False
+        self.dataset = VoxKP(args, split)
+        self.iterator = 0
+
+        if params is not None:
+            self.load_state_dict(params)
+
+        num_samples = length if length > 0 else len(self)
+
+        sampler = SubsetSampler(num_samples, self.iterator)
+
+        self.loader = data.DataLoader(dataset = self.dataset, batch_size = args.batch_size,
+                                      sampler = sampler, num_workers = num_workers)
+
+    def __iter__(self):
+        for batch_data in self.loader:
+            self.iterator += batch_data[0].shape[0]
+            if self.iterator >= len(self):
+                self.iterator = 0
+                if self.shuffle:
+                    random.shuffle(self.loader.dataset.indices)
+            yield batch_data
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def load_state_dict(self, params):
+        if 'split' in params:
+            assert self.split == params['split']
+        self.dataset.indices = params.get('indices', self.dataset.indices)
+        self.iterator = params.get('iterator', self.iterator)
+
+    def state_dict(self):
+        return {'indices' : self.loader.dataset.indices, 'iterator' : self.iterator, 'split' : self.split}
+
+    def get_df(self):
+        return self.dataset.df
+
+# # import pandas as pd
+# # df = pd.read_csv("train.csv")
+# AUDIO_SHAPE = 67267
+# configs = {
+#     "input_shape": [None, AUDIO_SHAPE],
+#     "audio_to_pose": {"num_keypoints": 136, "processor": "audio_to_pose", "flatten": False, "input_shape": [None, AUDIO_SHAPE]},
+#     "audio_to_pose_inference": {"num_keypoints": 136, "processor": "audio_to_pose_inference", "flatten": False, "input_shape": [None, AUDIO_SHAPE]}
+# }
+#
+# # path = r"C:\Users\sidhu\Desktop\train.csv"
+# mydata = VoxKP(args, "train", configs["audio_to_pose"]).__getitem__([0])
