@@ -75,8 +75,6 @@ def parse_args():
                     help = 'Path to the csv file containing information about dataset')
     parser.add_argument('--num_keypoints', type = int, default = 136,
                     help = 'No. of keypoints')
-    parser.add_argument('--audio_shape', type = int, default = 67267,
-                    help = 'Size of audio') # Remove this after extracting melspect in preprocessing
     parser.add_argument('--flatten', type = str2bool, default = False,
                     help = 'Whether to flatten keypoints')
     parser.add_argument('--speaker', type = str, default = 'human',
@@ -87,7 +85,7 @@ def parse_args():
 
     args = parser.parse_args()
 
-    assert args.save_checkpoint_every % (args.iter_d + args.iter_g) == 0, 'Checkpoint saving has to be after training all the components'
     assert args.log_losses_every % (args.iter_d + args.iter_g) == 0, 'Losses has to be logged after training all the components'
+    assert args.save_checkpoint_every % args.log_losses_every == 0, 'Checkpoint has to be saved after logging latest loss'
 
     return args
