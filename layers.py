@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils import ConvLayer, MelSpectrogram, to_motion_delta
+from utils import ConvLayer, to_motion_delta
 
 class ImageEncoderPIV(nn.Module):
     """
@@ -24,13 +24,14 @@ class ImageEncoderPIV(nn.Module):
         Parameters
         ----------
         image       : torch.tensor of shape (B, 136, L)
-
+                      Input image
         Returns
         -------
-        img_enc_piv : torch.tensor of shape (B, 32, L)
+        img_enc_piv : torch.tensor of shape (B, 32)
+                      PIV encoding of the input image
         """
         image = image.unsqueeze(-1) #(B,136,L,1)
-        img_enc_piv = self.layers(image).mean(dim = 3)
+        img_enc_piv = self.layers(image).mean(dim = 2).squeeze(-1)
         return img_enc_piv
 
 class ImageEncoderPV(nn.Module):
@@ -48,10 +49,12 @@ class ImageEncoderPV(nn.Module):
         Parameters
         ----------
         image : torch.tensor of shape (B, 136, 1)
+                Input image
 
         Returns
         -------
         x     : torch.tensor of shape (B, 128, 2)
+                PV encoding of the image
         """
         x = self.conv1(image)
         x = torch.repeat_interleave(x, 2, dim = 2)
@@ -87,21 +90,26 @@ class AudioEncoder(nn.Module):
                                     ConvLayer(256, 256, 3, 1, 1, '1D', seq = True),
                                     ConvLayer(256, 256, 3, 1, 1, '1D', seq = True)])
 
-    def forward(self, audio, pose, img_enc_pv, img_enc_piv):
+    def forward(self, audio_spect, img_enc_pv, img_enc_piv, temporal_size):
         """
         Parameters
         ----------
-        audio       : torch.tensor of shape (B, 1, 418, 64)
-        pose        : torch.tensor of shape (B, 136, 64)
-        img_enc_pv  : torch.tensor of shape (B, 128, 2)
-        img_enc_piv : torch.tensor of shape (B, 32, 2)
+        audio_spect   : torch.tensor of shape (B, 1, 418, 64)
+                        Mel spectrogram of audio
+        img_enc_pv    : torch.tensor of shape (B, 128, 2)
+                        PV encoding
+        img_enc_piv   : torch.tensor of shape (B, 32, 2)
+                        PIV encoding
+        temporal_size : int
+                        Size of temporal stack
 
         Returns
         -------
         x           : torch.tensor of shape (B, 256, 64)
+                      Audio encoding
         """
-        x = self.downsampling_blocks1to4(audio) #(B,256,50,1)
-        x = F.interpolate(x, (pose.shape[2], 1), mode = 'bilinear', align_corners = False).squeeze(-1) #(B,256,64)
+        x = self.downsampling_blocks1to4(audio_spect) #(B,256,50,1)
+        x = F.interpolate(x, (temporal_size, 1), mode = 'bilinear', align_corners = False).squeeze(-1) #(B,256,64)
         outs = list()
         for layer in self.downsampling_blocks5to10:
             x = layer(x)
@@ -129,10 +137,11 @@ class Decoder(nn.Module):
         Parameters
         ----------
         audio_enc : torch.tensor of shape (B, 256, 64)
-
+                    Audio encoding
         Returns
         -------
         logits    : torch.tensor of shape (B, 136, 64)
+                    Fake pose
         """
         dec = self.layers(audio_enc)
         logits = self.logits(dec)
@@ -173,10 +182,12 @@ class Discriminator(nn.Module):
         Parameters
         ----------
         pose  : torch.tensor of shape (B, 134, 64)
+                Fake or real pose
 
         Returns
         -------
         score : torch.tensor of shape (B, 16)
+                Realism score
         """
         motion_or_pose = self.motion_or_pose(pose) #(B,134,63), (B,134,64) or (B,134,127)
         score = self.layers(motion_or_pose).squeeze(1)
@@ -189,22 +200,28 @@ class Generator(nn.Module):
         self.audio_encoder = AudioEncoder()
         self.decoder = Decoder()
 
-    def forward(self, audio, pose, img, img_enc_piv):
+    def forward(self, audio_spect, img, img_enc_piv, temporal_size):
         """
         Parameters
         ----------
-        audio       : torch.tensor of shape (B, config.input_shape[1])
-        pose        : torch.tensor of shape (B, 136, 64)
-        img         : torch.tensor of shape (B, 136, 1)
-        img_enc_piv : torch.tensor of shape (B, 32, 1)
+        audio_spect   : torch.tensor of shape (B, 1, 418, 64)
+                        Mel spectrogram of audio
+        pose          : torch.tensor of shape (B, 136, 64)
+                        Ground truth pose
+        img           : torch.tensor of shape (B, 136, 1)
+                        Input image
+        img_enc_piv   : torch.tensor of shape (B, 32, 1)
+                        PIV encoding of img
+        temporal_size : int
+                        Size of temporal stack
 
         Returns
         -------
-        out         : torch.tensor of shape (B, 136, 64)
+        fake_pose     : torch.tensor of shape (B, 136, 64)
+                        Pose created by generator
         """
         img_enc_pv = self.image_encoder_pv(img) #(B,128,2)
-        img_enc_piv = torch.repeat_interleave(img_enc_piv, 2, dim = 2) #(B,32,2)
-        audio_input = MelSpectrogram(audio) #(B,1,418,64)
-        audio_enc = self.audio_encoder(audio_input, pose, img_enc_pv, img_enc_piv) #(B,256,64)
-        out = self.decoder(audio_enc) #(B,136,64)
-        return out
+        img_enc_piv = torch.repeat_interleave(img_enc_piv.unsqueeze(2), 2, dim = 2) #(B,32,2)
+        audio_enc = self.audio_encoder(audio_spect, img_enc_pv, img_enc_piv, temporal_size) #(B,256,64)
+        fake_pose = self.decoder(audio_enc) #(B,136,64)
+        return fake_pose
