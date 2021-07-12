@@ -28,7 +28,7 @@ class VoxKP(data.Dataset):
         audio_spect = arr['melspect']
         audio_spect = np.expand_dims(audio_spect, 0) # Adding a channel (1, 418, 64)
         real_pose = preprocess_to_relative(arr['pose'])
-        real_pose = normalize_relative_keypoints(real_pose, row['speaker'])
+        real_pose = normalize_relative_keypoints(real_pose)
         real_pose = real_pose.flatten() if self.flatten else np.swapaxes(real_pose, 1, 0)
         real_pose = torch.from_numpy(real_pose.astype(np.float32))
         audio_spect = torch.from_numpy(audio_spect)
