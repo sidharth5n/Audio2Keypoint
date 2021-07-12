@@ -141,7 +141,7 @@ def preprocess_to_relative(k, reshape = True, num_keypoints = 68):
         return relative.reshape((-1, num_keypoints * 2))
     return relative
 
-def normalize_relative_keypoints(k, speaker):
+def normalize_relative_keypoints(k):
     """
     Mean variance normalizes the key points.
 

@@ -43,9 +43,8 @@ def eval_split(model, loader, loss_fns, args, device, scaling = True, shift_pred
         base_path = os.path.join(args.dump_path, args.id, '%s' %
                                  (str(tc).replace('.', '-').replace(' ', '--').replace(':', '-')))
         os.makedirs(base_path)
-        save_prediction_video_by_percentiles(loader.get_df(), fake_keypoints_list, #.detach().permute(0, 1, 3, 2).cpu().numpy(),
-                                             gt_keypoints_list, #.detach().permute(0, 1, 3, 2).cpu().numpy(),
-                                             # os.path.join(base_path, str(j)),
+        save_prediction_video_by_percentiles(loader.get_df(), fake_keypoints_list,
+                                             gt_keypoints_list,
                                              base_path,
                                              train_ratio=args.train_ratio,
                                              limit=32, loss = losses.detach().cpu().numpy())
@@ -138,6 +137,3 @@ def save_prediction_video(df, keypoints_pred, keypoints_gt, save_path, limit=Non
             otpt_fn = otpt_fn.format(loss=loss[i])
         save_video_from_audio_video(audio_out_path, temp_otpt_fn, otpt_fn)
         subprocess.call('rm -R "%s"' % (dir_name), shell=True)
-
-        if i >= limit:
-            break
