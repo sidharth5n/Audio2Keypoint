@@ -38,7 +38,7 @@ def parse_args():
                     help = 'No. of iterations to train generator.')
     parser.add_argument('--iter_d', type = int, default = 1,
                     help = 'No. of iterations to train discriminator.')
-    parser.add_argument('--batch_size', type = int, default = 8,
+    parser.add_argument('--batch_size', type = int, default = 32,
                     help = 'Size of mini batch during training')
     parser.add_argument('--epochs', type = int, default = 300,
                     help = 'No. of epochs of training')
