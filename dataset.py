@@ -1,16 +1,59 @@
 from __future__ import print_function, division
 import numpy as np
+import librosa
 import pandas as pd
 import torch
 import torch.utils.data as data
 
-from utils import preprocess_to_relative, normalize_relative_keypoints
+from utils import preprocess_to_relative, normalize_relative_keypoints, pad_audio, mel_spectrogram
+from consts import SR, FPS, AUDIO_SHAPE
+
+class AudioSample(data.Dataset):
+    def __init__(self, args):
+        self.flatten = args.flatten
+
+    def preprocess_audio_and_image(self, args, device):
+        audio, _ = librosa.load(args.audio_path, sr = SR, mono = True)
+        pose_shape = int(FPS * float(audio.shape[0]) / SR)
+        padded_pose_shape = pose_shape + (2**6) - pose_shape % (2**6)
+        padded_audio_shape = int(padded_pose_shape * SR / FPS)
+        padded_audio = np.pad(audio, [0, padded_audio_shape - audio.shape[0]], mode = 'reflect')
+        total_div = padded_audio_shape // 40960
+        for i in range(total_div):
+            pad_audio_use = padded_audio[i*40960: (i+1)*40960]
+            mel_spect = mel_spectrogram(pad_audio(pad_audio_use, AUDIO_SHAPE), args)
+            np.save(os.path.join('data', 'temp', f'{i}.npy'), mel_spect)
+
+        import face_alignment
+        from skimage import io
+        
+        input = io.imread(args.image_path)
+        fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False, device = device)
+        pred = fa.get_landmarks(input)[0]
+        pred = pred.T
+        np.save(os.path.join('data', 'temp', 'driving.npy'), pred)
+
+        return pred, pose_shape, padded_pose_shape
+
+    def __len__(self):
+        return len(os.listdir(os.path.join('data', 'temp')))
+
+    def __getitem__(self, idx):
+        audio_spect = np.load(os.path.join('data', 'temp', f'{i}.npy'))
+        audio_spect = torch.from_numpy(audio_spect)
+        if idx == 0:
+            driving_input = np.load(os.path.join('data', 'temp', 'driving.npy'))
+            driving_input = preprocess_to_relative(driving_input)
+            driving_input = normalize_relative_keypoints(driving_input)
+            driving_input = driving_input.flatten() if self.flatten else np.swapaxes(driving_input, 1, 0)
+            driving_input = torch.from_numpy(driving_input.astype(np.float32))
+        else:
+            driving_input = None
+        return audio_spect, driving_input
 
 class VoxKP(data.Dataset):
     def __init__(self, args, split):
         df = pd.read_csv(args.train_csv)
-        if args.speaker != None:
-            df = df[df['speaker'] == args.speaker]
         self.df = df[df['dataset'] == split]
         self.flatten = args.flatten
         self.indices = [*range(len(self.df))]
@@ -21,7 +64,7 @@ class VoxKP(data.Dataset):
     def __getitem__(self, idx):
         """
         audio_spect : torch.tensor of shape (1, 418, 64)
-        real_pose : torch.tensor of shape (136, 64)
+        real_pose   : torch.tensor of shape (136, 64)
         """
         row = self.df.iloc[self.indices[idx]]
         arr = np.load(row['pose_fn'])
@@ -97,15 +140,3 @@ class DataLoader:
 
     def get_df(self):
         return self.dataset.df
-
-# # import pandas as pd
-# # df = pd.read_csv("train.csv")
-# AUDIO_SHAPE = 67267
-# configs = {
-#     "input_shape": [None, AUDIO_SHAPE],
-#     "audio_to_pose": {"num_keypoints": 136, "processor": "audio_to_pose", "flatten": False, "input_shape": [None, AUDIO_SHAPE]},
-#     "audio_to_pose_inference": {"num_keypoints": 136, "processor": "audio_to_pose_inference", "flatten": False, "input_shape": [None, AUDIO_SHAPE]}
-# }
-#
-# # path = r"C:\Users\sidhu\Desktop\train.csv"
-# mydata = VoxKP(args, "train", configs["audio_to_pose"]).__getitem__([0])
