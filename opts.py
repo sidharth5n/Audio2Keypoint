@@ -71,15 +71,14 @@ def parse_args():
                     help = 'Store losses after how many iterations')
 
     # Dataset related
-    parser.add_argument('--train_csv', type = str, default = 'data/train.csv',
+    parser.add_argument('--csv', type = str, default = 'data/infos.csv',
                     help = 'Path to the csv file containing information about dataset')
-    parser.add_argument('--num_keypoints', type = int, default = 136,
-                    help = 'No. of keypoints')
+    parser.add_argument('--data_dir', type = str, default = 'data',
+                    help = 'Root directory where data is placed')
     parser.add_argument('--flatten', type = str2bool, default = False,
                     help = 'Whether to flatten keypoints')
-    parser.add_argument('--speaker', type = str, default = 'human',
-                    help = '')
 
+    # General
     parser.add_argument('--device', type = str, choices = ['cuda', 'cpu'], default = 'cuda',
                     help = 'One of cuda or cpu')
 
