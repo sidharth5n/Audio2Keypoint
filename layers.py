@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils import ConvLayer, to_motion_delta
+from utils import ConvLayer, to_motion_delta, keypoints_to_train
 
 class ImageEncoderPIV(nn.Module):
     """
@@ -178,18 +178,21 @@ class Discriminator(nn.Module):
                       nn.Conv1d(64*n, 1, 4, 1, 0)])
         self.layers = nn.Sequential(*layers)
 
-    def forward(self, pose):
+    def forward(self, pose, keypoints):
         """
         Parameters
         ----------
-        pose  : torch.tensor of shape (B, 134, 64)
-                Fake or real pose
+        pose      : torch.tensor of shape (B, 136, 64)
+                    Fake or real pose
+        keypoints : torch.tensor of shape (<=68,)
+                    Keypoints on which to discriminate
 
         Returns
         -------
-        score : torch.tensor of shape (B, 16)
-                Realism score
+        score     : torch.tensor of shape (B, 16)
+                    Realism score
         """
+        pose = keypoints_to_train(pose, keypoints) #(B,134,64)
         motion_or_pose = self.motion_or_pose(pose) #(B,134,63), (B,134,64) or (B,134,127)
         score = self.layers(motion_or_pose).squeeze(1)
         return score
