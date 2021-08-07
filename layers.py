@@ -7,9 +7,9 @@ class ImageEncoderPIV(nn.Module):
     """
     Pose Invariant Encoder
     """
-    def __init__(self):
+    def __init__(self, num_keypoints):
         super(ImageEncoderPIV, self).__init__()
-        self.layers = nn.Sequential(*ConvLayer(136, 128, 3, 1, 1, '2D'),
+        self.layers = nn.Sequential(*ConvLayer(num_keypoints, 128, 3, 1, 1, '2D'),
                                     *ConvLayer(128, 128, 3, 1, 1, '2D'),
                                     *ConvLayer(128, 128, 3, 1, 1, '2D'),
                                     *ConvLayer(128, 128, 3, 1, 1, '2D'),
@@ -38,9 +38,9 @@ class ImageEncoderPV(nn.Module):
     """
     Pose Variant Encoder
     """
-    def __init__(self):
+    def __init__(self, num_keypoints):
         super(ImageEncoderPV, self).__init__()
-        self.conv1 = ConvLayer(136, 128, 3, 1, 1, '1D', seq = True)
+        self.conv1 = ConvLayer(num_keypoints, 128, 3, 1, 1, '1D', seq = True)
         self.conv2 = ConvLayer(128, 128, 4, 2, 1, '1D', seq = True)
         self.conv3 = ConvLayer(128, 128, 3, 1, 1, '1D', seq = True)
 
@@ -65,8 +65,9 @@ class ImageEncoderPV(nn.Module):
 
 class AudioEncoder(nn.Module):
 
-    def __init__(self):
+    def __init__(self, temporal_size):
         super(AudioEncoder, self).__init__()
+        self.temporal_size = temporal_size
         self.downsampling_blocks1to4 = nn.Sequential(*ConvLayer(1, 64, 3, 1, 1, '2D'),
                                                      *ConvLayer(64, 64, 4, 2, 1, '2D'),
                                                      *ConvLayer(64, 128, 3, 1, 1, '2D'),
@@ -90,7 +91,7 @@ class AudioEncoder(nn.Module):
                                     ConvLayer(256, 256, 3, 1, 1, '1D', seq = True),
                                     ConvLayer(256, 256, 3, 1, 1, '1D', seq = True)])
 
-    def forward(self, audio_spect, img_enc_pv, img_enc_piv, temporal_size):
+    def forward(self, audio_spect, img_enc_pv, img_enc_piv):
         """
         Parameters
         ----------
@@ -109,7 +110,7 @@ class AudioEncoder(nn.Module):
                         Audio encoding
         """
         x = self.downsampling_blocks1to4(audio_spect) #(B,256,50,1)
-        x = F.interpolate(x, (temporal_size, 1), mode = 'bilinear', align_corners = False).squeeze(-1) #(B,256,64)
+        x = F.interpolate(x, (self.temporal_size, 1), mode = 'bilinear', align_corners = False).squeeze(-1) #(B,256,64)
         outs = list()
         for layer in self.downsampling_blocks5to10:
             x = layer(x)
@@ -124,13 +125,13 @@ class AudioEncoder(nn.Module):
         return x
 
 class Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, num_keypoints):
         super(Decoder, self).__init__()
         self.layers = nn.Sequential(*ConvLayer(256, 256, 3, 1, 1, '1D'),
                                     *ConvLayer(256, 256, 3, 1, 1, '1D'),
                                     *ConvLayer(256, 256, 3, 1, 1, '1D'),
                                     *ConvLayer(256, 256, 3, 1, 1, '1D'))
-        self.logits = nn.Conv1d(256, 136, kernel_size = 1, stride = 1, padding = 0)
+        self.logits = nn.Conv1d(256, num_keypoints, kernel_size = 1, stride = 1, padding = 0)
 
     def forward(self, audio_enc):
         """
@@ -148,7 +149,7 @@ class Decoder(nn.Module):
         return logits
 
 class Discriminator(nn.Module):
-    def __init__(self, d_input, n_downsampling = 2):
+    def __init__(self, d_input, num_keypoints, n_downsampling = 2):
         super(Discriminator, self).__init__()
         self.d_input = d_input
         # d motion or pose
@@ -161,9 +162,9 @@ class Discriminator(nn.Module):
 
         if d_input in ['motion', 'both']:
             layers = [nn.ConstantPad1d((1, 2), 0), # TF uses asymmetrical padding
-                      *ConvLayer(134, 64, 4, 2, 0, '1D', False)]
+                      *ConvLayer(num_keypoints - 2, 64, 4, 2, 0, '1D', False)]
         else:
-            layers = ConvLayer(134, 64, 4, 2, 1, '1D', False)
+            layers = ConvLayer(num_keypoints - 2, 64, 4, 2, 1, '1D', False)
 
         for i in range(1, n_downsampling+1):
             n = min(2**i, 8)
@@ -194,13 +195,13 @@ class Discriminator(nn.Module):
         return score
 
 class Generator(nn.Module):
-    def __init__(self):
+    def __init__(self, temporal_size, num_keypoints):
         super(Generator, self).__init__()
-        self.image_encoder_pv = ImageEncoderPV()
-        self.audio_encoder = AudioEncoder()
-        self.decoder = Decoder()
+        self.image_encoder_pv = ImageEncoderPV(num_keypoints)
+        self.audio_encoder = AudioEncoder(temporal_size)
+        self.decoder = Decoder(num_keypoints)
 
-    def forward(self, audio_spect, img, img_enc_piv, temporal_size):
+    def forward(self, audio_spect, img, img_enc_piv):
         """
         Parameters
         ----------
@@ -210,8 +211,6 @@ class Generator(nn.Module):
                         Input image
         img_enc_piv   : torch.tensor of shape (B, 32, 1)
                         PIV encoding of img
-        temporal_size : int
-                        Size of temporal stack
 
         Returns
         -------
@@ -220,6 +219,6 @@ class Generator(nn.Module):
         """
         img_enc_pv = self.image_encoder_pv(img) #(B,128,2)
         img_enc_piv = torch.repeat_interleave(img_enc_piv.unsqueeze(2), 2, dim = 2) #(B,32,2)
-        audio_enc = self.audio_encoder(audio_spect, img_enc_pv, img_enc_piv, temporal_size) #(B,256,64)
+        audio_enc = self.audio_encoder(audio_spect, img_enc_pv, img_enc_piv) #(B,256,64)
         fake_pose = self.decoder(audio_enc) #(B,136,64)
         return fake_pose
