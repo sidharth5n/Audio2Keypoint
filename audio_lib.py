@@ -15,7 +15,11 @@ def frame_number_to_seconds(num, fps):
 def time_in_seconds_to_datetime(time_seconds):
     return str(datetime.timedelta(seconds=time_seconds))
 
+def get_string_to_timedata(time):
+    return datetime.datetime.strptime(time, '%H:%M:%S.%f')
+
 def get_timedata_to_seconds(td):
+    td = get_string_to_timedata(td) if isinstance(td, str) else td
     return td.hour * HOUR + td.minute * MINUTE + td.second * SECOND + float(td.microsecond) / 1000000.
 
 def get_pose_path(base_path, speaker, pose_fn):
