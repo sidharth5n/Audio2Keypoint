@@ -1,7 +1,9 @@
 from __future__ import print_function, division
+import os
 import numpy as np
 import librosa
 import pandas as pd
+import random
 import torch
 import torch.utils.data as data
 
@@ -26,7 +28,7 @@ class AudioSample(data.Dataset):
 
         import face_alignment
         from skimage import io
-        
+
         input = io.imread(args.image_path)
         fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False, device = device)
         pred = fa.get_landmarks(input)[0]
@@ -53,8 +55,9 @@ class AudioSample(data.Dataset):
 
 class VoxKP(data.Dataset):
     def __init__(self, args, split):
-        df = pd.read_csv(args.train_csv)
-        self.df = df[df['dataset'] == split]
+        self.data_dir = args.data_dir
+        df = pd.read_csv(args.csv)
+        self.df = df[df['split'] == split]
         self.flatten = args.flatten
         self.indices = [*range(len(self.df))]
 
@@ -67,7 +70,7 @@ class VoxKP(data.Dataset):
         real_pose   : torch.tensor of shape (136, 64)
         """
         row = self.df.iloc[self.indices[idx]]
-        arr = np.load(row['pose_fn'])
+        arr = np.load(os.path.join(self.data_dir, row['pose_fn']))
         audio_spect = arr['melspect']
         audio_spect = np.expand_dims(audio_spect, 0) # Adding a channel (1, 418, 64)
         real_pose = preprocess_to_relative(arr['pose'])
