@@ -116,10 +116,13 @@ class Audio2Keypoint(nn.Module):
         fake_pose_score = self.discriminator(D_fake_pose)
         return img_enc_piv, fake_pose, real_enc, fake_enc, fake_pose_score
 
+    @torch.no_grad()
     def _predict(self, audio_spect, real_pose):
         """
         Forward pass for validation.
 
+        Parameters
+        ----------
         audio_spect     : torch.tensor of shape (B, 1, 418, 64)
                           Mel spectrogram of audio
         real_pose       : torch.tensor of shape (B, 136, 64)
@@ -136,36 +139,40 @@ class Audio2Keypoint(nn.Module):
         img_enc_piv     : torch.tensor of shape (B, 32)
                           PIV encoding of input image
         """
-        with torch.no_grad():
-            image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
-            img_enc_piv = self.encoder(image) #(B,32)
-            fake_pose = self.generator(audio_spect, image, img_enc_piv) #(B,136,64)
-            fake_enc = self.encoder(fake_pose) #(B,32)
-            D_fake_pose = keypoints_to_train(fake_pose, self.keypoints)
-            fake_pose_score = self.discriminator(D_fake_pose)
+        image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
+        img_enc_piv = self.encoder(image) #(B,32)
+        fake_pose = self.generator(audio_spect, image, img_enc_piv) #(B,136,64)
+        fake_enc = self.encoder(fake_pose) #(B,32)
+        D_fake_pose = keypoints_to_train(fake_pose, self.keypoints)
+        fake_pose_score = self.discriminator(D_fake_pose)
         return fake_pose, fake_pose_score, fake_enc, img_enc_piv
 
+    @torch.no_grad()
     def _sample(self, audio_spect, real_pose):
         """
-        Forward pass for validation.
+        Forward pass for generating a sample.
 
-        audio_spect     : torch.tensor of shape (B, 1, 418, 64)
-                          Mel spectrogram of audio
-        real_pose       : torch.tensor of shape (B, 136, 1)
-                          Ground truth pose
+        Parameters
+        ----------
+        audio_spect : torch.tensor of shape (B, 1, 418, 64)
+                      Mel spectrogram of audio
+        real_pose   : torch.tensor of shape (B, 136, 1)
+                      Ground truth pose
 
         Returns
         -------
-        fake_pose       : torch.tensor of shape (B, 136, 1)
-                          Pose created by generator
+        fake_pose   : torch.tensor of shape (B, 136, 1)
+                      Pose created by generator
         """
-        with torch.no_grad():
-            image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
-            img_enc_piv = self.encoder(image) #(B,32)
-            fake_pose = self.generator(audio_spect, image, img_enc_piv) #(B,136,1)
+        image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
+        img_enc_piv = self.encoder(image) #(B,32)
+        fake_pose = self.generator(audio_spect, image, img_enc_piv) #(B,136,1)
         return fake_pose
 
     def __init_weights(self):
+        """
+        Glorot initialization of weights.
+        """
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
