@@ -3,14 +3,15 @@ import torch.nn as nn
 
 from layers import ImageEncoderPIV, Generator, Discriminator
 from utils import keypoints_to_train, get_training_keypoints
+from consts import FRAMES_PER_SAMPLE, NUM_KEYPOINTS
 
 class Audio2Keypoint(nn.Module):
 
     def __init__(self, args):
         super(Audio2Keypoint, self).__init__()
-        self.encoder = ImageEncoderPIV()
-        self.generator = Generator()
-        self.discriminator = Discriminator(args.d_input)
+        self.encoder = ImageEncoderPIV(NUM_KEYPOINTS)
+        self.generator = Generator(FRAMES_PER_SAMPLE, NUM_KEYPOINTS)
+        self.discriminator = Discriminator(args.d_input, NUM_KEYPOINTS)
         self.register_buffer('keypoints', get_training_keypoints()) # get full body keypoints
         self.__init_weights()
 
@@ -41,7 +42,7 @@ class Audio2Keypoint(nn.Module):
         with torch.no_grad():
             image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
             img_enc_piv = self.encoder(image) #(B,32,1)
-            fake_pose = self.generator(audio_spect, image, img_enc_piv, real_pose.shape[2]) #(B,136,64)
+            fake_pose = self.generator(audio_spect, image, img_enc_piv) #(B,136,64)
         D_real_pose = keypoints_to_train(real_pose, self.keypoints) #(B,134,64)
         real_pose_score = self.discriminator(D_real_pose) #(B,16)
         D_fake_pose = keypoints_to_train(fake_pose, self.keypoints)
@@ -75,7 +76,7 @@ class Audio2Keypoint(nn.Module):
         image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
         with torch.no_grad():
             img_enc_piv = self.encoder(image) #(B,32)
-        fake_pose = self.generator(audio_spect, image, img_enc_piv, real_pose.shape[2]) #(B,136,64)
+        fake_pose = self.generator(audio_spect, image, img_enc_piv) #(B,136,64)
         real_enc = self.encoder(real_pose) #(B,32)
         fake_enc = self.encoder(fake_pose) #(B,32)
         D_fake_pose = keypoints_to_train(fake_pose, self.keypoints)
@@ -108,7 +109,7 @@ class Audio2Keypoint(nn.Module):
         """
         image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
         img_enc_piv = self.encoder(image) #(B,32)
-        fake_pose = self.generator(audio_spect, image, img_enc_piv, real_pose.shape[2]) #(B,136,64)
+        fake_pose = self.generator(audio_spect, image, img_enc_piv) #(B,136,64)
         real_enc = self.encoder(real_pose) #(B,32)
         fake_enc = self.encoder(fake_pose) #(B,32)
         D_fake_pose = keypoints_to_train(fake_pose, self.keypoints)
@@ -138,11 +139,31 @@ class Audio2Keypoint(nn.Module):
         with torch.no_grad():
             image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
             img_enc_piv = self.encoder(image) #(B,32)
-            fake_pose = self.generator(audio_spect, image, img_enc_piv, real_pose.shape[2]) #(B,136,64)
+            fake_pose = self.generator(audio_spect, image, img_enc_piv) #(B,136,64)
             fake_enc = self.encoder(fake_pose) #(B,32)
             D_fake_pose = keypoints_to_train(fake_pose, self.keypoints)
             fake_pose_score = self.discriminator(D_fake_pose)
         return fake_pose, fake_pose_score, fake_enc, img_enc_piv
+
+    def _sample(self, audio_spect, real_pose):
+        """
+        Forward pass for validation.
+
+        audio_spect     : torch.tensor of shape (B, 1, 418, 64)
+                          Mel spectrogram of audio
+        real_pose       : torch.tensor of shape (B, 136, 1)
+                          Ground truth pose
+
+        Returns
+        -------
+        fake_pose       : torch.tensor of shape (B, 136, 1)
+                          Pose created by generator
+        """
+        with torch.no_grad():
+            image = real_pose[...,0].unsqueeze(2) #(B, 136, 1)
+            img_enc_piv = self.encoder(image) #(B,32)
+            fake_pose = self.generator(audio_spect, image, img_enc_piv) #(B,136,1)
+        return fake_pose
 
     def __init_weights(self):
         for p in self.parameters():
